@@ -109,11 +109,15 @@ struct SourceShaderDef
     std::string                        vertexSource;
     std::string                        vertexByteCode;
     std::string                        vertexMetadata;
+    std::vector<uint8_t>               vertexByteCodeBinary;
     std::string                        fragmentSource;
     std::string                        fragmentByteCode;
     std::string                        fragmentMetadata;
+    std::vector<uint8_t>               fragmentByteCodeBinary;
     std::string                        vertexHash;
+    std::vector<uint32_t>              vertexHashBinary;
     std::string                        fragmentHash;
+    std::vector<uint32_t>              fragmentHashBinary;
     std::vector<SourceShaderParam>     params;
     SourceShaderInfo                   info;
     std::string                        format;
@@ -127,6 +131,7 @@ struct SourceTextureDef
 
     std::filesystem::path              input;
     std::string                        data;
+    std::vector<uint8_t>               bytes;
     SourceShaderInfo                   info;
     std::map<std::string, std::string> presetParams;
 };

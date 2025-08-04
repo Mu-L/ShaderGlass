@@ -35,8 +35,8 @@ static uint8_t* CopyVector(const std::vector<uint8_t>& d)
 ShaderDef ShaderGC::CompileSourceShader(SourceShaderDef& def, ostream& log, bool& warn, const ShaderCache& cache)
 {
     // convert GLSL to SPIRV
-    auto vertexSPIRV   = GLSL::GenerateSPIRV(def.vertexSource.c_str(), false, log, warn);
-    auto fragmentSPIRV = GLSL::GenerateSPIRV(def.fragmentSource.c_str(), true, log, warn);
+    auto vertexSPIRV   = GLSL::GenerateSPIRV(def.vertexSource.c_str(), false, log, warn, false);
+    auto fragmentSPIRV = GLSL::GenerateSPIRV(def.fragmentSource.c_str(), true, log, warn, false);
 
     // convert SPIRV to HLSL and reflect
     auto vertexHLSL   = SPIRV::GenerateHLSL(vertexSPIRV, false, log, warn);

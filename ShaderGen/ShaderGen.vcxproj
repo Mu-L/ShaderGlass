@@ -157,6 +157,7 @@
     <ClCompile Include="ShaderGen.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Binary.template" />
     <None Include="Preset.template" />
     <None Include="Shader.template" />
     <None Include="Texture.template" />

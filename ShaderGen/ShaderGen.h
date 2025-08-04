@@ -51,6 +51,9 @@ bool             _force = false;
 bool             _tools = false;
 filesystem::path outputPath;
 
+bool _binary = false;
+bool _vulkan = false;
+
 void replace(string& str, const string& macro, const string& value)
 {
     auto i = str.find(macro);
@@ -115,7 +118,7 @@ SourceShaderInfo getShaderInfo(const filesystem::path& slangInput, const string&
     info.className    = className.str();
     info.shaderName   = shaderName.str();
     info.sourcePath   = slangInput;
-    info.relativePath = filesystem::path(string(_libName) + "\\" + info.category + "\\" + info.className + suffix + ".h").lexically_normal();
+    info.relativePath = filesystem::path(string(_libName) + "\\" + info.category + "\\" + info.className + suffix + (_binary ? ".bin" : ".h")).lexically_normal();
     info.outputPath   = filesystem::path(outputPath / info.relativePath.string()).lexically_normal();
     filesystem::create_directories(info.outputPath.parent_path());
 

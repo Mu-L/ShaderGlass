@@ -24,6 +24,7 @@
     <None Include="Preset.template" />
     <None Include="Texture.template" />
     <None Include="List.template" />
+    <None Include="Binary.template" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ShaderGen.h">

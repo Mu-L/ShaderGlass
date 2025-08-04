@@ -8,6 +8,7 @@ echo This will take a bit of time (10 min?)
 pause
 
 del /q ..\ShaderGlass\Shaders\RetroArch.h
+del /q ..\ShaderGlass\Shaders\RetroArch.lst
 rmdir /s /q ..\ShaderGlass\Shaders\RetroArch
 rmdir /s /q temp
-..\x64\Release\ShaderGen.exe *
+..\x64\Release\ShaderGen.exe -binary -vulkan *

@@ -10,5 +10,5 @@ GNU General Public License v3.0
 class GLSL
 {
 public:
-    static std::vector<uint32_t> GenerateSPIRV(const char* source, bool fragment, std::ostream& log, bool& warn);
+    static std::vector<uint32_t> GenerateSPIRV(const char* source, bool fragment, std::ostream& log, bool& warn, bool vulkan);
 };

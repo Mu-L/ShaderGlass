@@ -23,7 +23,7 @@ GNU General Public License v3.0
 #include <cstdio>
 #include <cstdint>
 
-std::vector<uint32_t> GLSL::GenerateSPIRV(const char* source, bool fragment, std::ostream& log, bool& warn)
+std::vector<uint32_t> GLSL::GenerateSPIRV(const char* source, bool fragment, std::ostream& log, bool& warn, bool vulkan)
 {
     //std::cout << "GenerateSPIRV...";
 
@@ -34,9 +34,9 @@ std::vector<uint32_t> GLSL::GenerateSPIRV(const char* source, bool fragment, std
         .language                          = GLSLANG_SOURCE_GLSL,
         .stage                             = stage,
         .client                            = GLSLANG_CLIENT_VULKAN,
-        .client_version                    = GLSLANG_TARGET_VULKAN_1_0,
+        .client_version                    = vulkan ? GLSLANG_TARGET_VULKAN_1_2 : GLSLANG_TARGET_VULKAN_1_0,
         .target_language                   = GLSLANG_TARGET_SPV,
-        .target_language_version           = GLSLANG_TARGET_SPV_1_0,
+        .target_language_version           = vulkan ? GLSLANG_TARGET_SPV_1_5 : GLSLANG_TARGET_SPV_1_0,
         .code                              = source,
         .default_version                   = 100,
         .default_profile                   = GLSLANG_NO_PROFILE,

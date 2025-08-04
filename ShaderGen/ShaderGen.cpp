@@ -21,6 +21,42 @@ filesystem::path reportPath;
 filesystem::path listPath;
 vector<string>   shaderList;
 
+void writeString(ofstream& f, const char* s)
+{
+    char padding[3] = {0, 0, 0};
+    auto len        = (unsigned char)strlen(s);
+    f.write(reinterpret_cast<const char*>(&len), sizeof(char));
+    f.write(s, len);
+    auto pad = (4 - ((len + 1) % 4)) % 4;
+    f.write(reinterpret_cast<const char*>(padding), pad);
+}
+
+void writeInt(ofstream& f, int v)
+{
+    f.write(reinterpret_cast<const char*>(&v), sizeof(int));
+}
+
+void writeFloat(ofstream& f, float v)
+{
+    f.write(reinterpret_cast<const char*>(&v), sizeof(float));
+}
+
+void writeHash(ofstream& f, const std::vector<uint32_t>& hash)
+{
+    for(int i = 0; i < HASH_LEN; i++)
+        writeInt(f, hash[i]);
+}
+
+void writeBytes(ofstream& f, const std::vector<uint8_t>& data)
+{
+    char padding[3] = {0, 0, 0};
+    auto len        = data.size();
+    writeInt(f, len);
+    f.write(reinterpret_cast<const char*>(data.data()), len);
+    auto pad = (4 - ((len + 1) % 4)) % 4;
+    f.write(reinterpret_cast<const char*>(padding), pad);
+}
+
 std::string exec(const char* cmd, ofstream& log)
 {
     std::array<char, 128> buffer;
@@ -55,7 +91,7 @@ void saveSource(const filesystem::path& fileName, const string& source)
     outfile.close();
 }
 
-filesystem::path glsl(const filesystem::path& shaderPath, const string& stage, const string& source, ofstream& log, bool& warn)
+pair<filesystem::path, vector<uint32_t>> glsl(const filesystem::path& shaderPath, const string& stage, const string& source, ofstream& log, bool& warn)
 {
     filesystem::path input = tempPath / shaderPath;
     input.replace_extension("." + stage + ".glsl");
@@ -77,18 +113,19 @@ filesystem::path glsl(const filesystem::path& shaderPath, const string& stage, c
             log << result << endl;
         if(result.find("error") != string::npos || result.find("ERROR") != string::npos)
             throw std::runtime_error("SPIR-V conversion error");
+        return make_pair(output, vector<uint32_t>());
     }
     else
     {
-        auto bin = GLSL::GenerateSPIRV(source.c_str(), stage == "frag", log, warn);
+        auto bin = GLSL::GenerateSPIRV(source.c_str(), stage == "frag", log, warn, _vulkan);
         if(bin.empty())
             throw std::runtime_error("SPIR-V conversion error");
 
         ofstream out(output, ios::binary | ios::trunc);
         out.write((const char*)bin.data(), bin.size() * sizeof(uint32_t));
         out.close();
+        return make_pair(output, bin);
     }
-    return output;
 }
 
 pair<string, string> spirv(const filesystem::path& input, const std::string& stage, ofstream& log, bool& warn)
@@ -162,7 +199,7 @@ static string intArrayToString(uint32_t* data, size_t size)
     return sbuf.str();
 }
 
-pair<string, string> fxc(const filesystem::path& shaderPath, const string& profile, const string& source, ofstream& log, bool& warn)
+tuple<string, string, vector<uint8_t>, vector<uint32_t>> fxc(const filesystem::path& shaderPath, const string& profile, const string& source, ofstream& log, bool& warn)
 {
     filesystem::path input = tempPath / shaderPath;
     input.replace_extension("." + profile + ".hlsl");
@@ -213,7 +250,7 @@ pair<string, string> fxc(const filesystem::path& shaderPath, const string& profi
             }
         }
 
-        return make_pair(outs.str(), "{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};");
+        return make_tuple(outs.str(), "{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};", vector<uint8_t>(), vector<uint32_t> {0, 0, 0, 0, 0, 0, 0, 0});
     }
     else
     {
@@ -227,7 +264,7 @@ pair<string, string> fxc(const filesystem::path& shaderPath, const string& profi
         outf << str;
         outf.close();
 
-        return make_pair(str, hashStr);
+        return make_tuple(str, hashStr, bin, hash);
     }
 }
 
@@ -253,7 +290,11 @@ string splitCode(const string& input)
 void updateShaderList(const SourceShaderInfo& shaderInfo)
 {
     ostringstream oss;
-    oss << "#include \"" << shaderInfo.relativePath.string() << "\"";
+    if(_binary)
+        oss << "S \"" << shaderInfo.relativePath.string() << "\"";
+    else
+        oss << "#include \"" << shaderInfo.relativePath.string() << "\"";
+
     const auto& shaderInclude = oss.str();
     if(find(shaderList.begin(), shaderList.end(), shaderInclude) == shaderList.end())
     {
@@ -265,6 +306,9 @@ void updateShaderList(const SourceShaderInfo& shaderInfo)
 
 void updateCacheList(const SourceShaderInfo& shaderInfo)
 {
+    if(_binary)
+        return;
+
     ostringstream oss;
     oss << " cached.emplace_back(";
     oss << _libName << shaderInfo.className << "ShaderDefs::sVertexHash, ";
@@ -287,7 +331,10 @@ void updateCacheList(const SourceShaderInfo& shaderInfo)
 void updateTextureList(const SourceShaderInfo& textureInfo)
 {
     ostringstream oss;
-    oss << "#include \"" << textureInfo.relativePath.string() << "\"";
+    if(_binary)
+        oss << "T \"" << textureInfo.relativePath.string() << "\"";
+    else
+        oss << "#include \"" << textureInfo.relativePath.string() << "\"";
     const auto& textureInclude = oss.str();
     if(find(shaderList.begin(), shaderList.end(), textureInclude) == shaderList.end())
     {
@@ -300,7 +347,10 @@ void updateTextureList(const SourceShaderInfo& textureInfo)
 void updatePresetList(const SourceShaderInfo& shaderInfo)
 {
     ostringstream oss;
-    oss << "#include \"" << shaderInfo.relativePath.string() << "\"";
+    if(_binary)
+        oss << "P \"" << shaderInfo.relativePath.string() << "\"";
+    else
+        oss << "#include \"" << shaderInfo.relativePath.string() << "\"";
     const auto& presetInclude = oss.str();
 
     ostringstream oss2;
@@ -316,19 +366,76 @@ void updatePresetList(const SourceShaderInfo& shaderInfo)
         updated = true;
     }
 
-    if(find(shaderList.begin(), shaderList.end(), presetClass) == shaderList.end())
+    if(!_binary)
     {
-        auto insertSpot = find(shaderList.begin(), shaderList.end(), "// %PRESET_CLASS%");
-        shaderList.insert(insertSpot, presetClass);
-        updated = true;
+        if(find(shaderList.begin(), shaderList.end(), presetClass) == shaderList.end())
+        {
+            auto insertSpot = find(shaderList.begin(), shaderList.end(), "// %PRESET_CLASS%");
+            shaderList.insert(insertSpot, presetClass);
+            updated = true;
+        }
     }
 
     if(updated)
         saveSource(listPath, shaderList);
 }
 
+void populateShaderBinary(SourceShaderDef def, ofstream& log)
+{
+    const auto& info = def.info;
+    ofstream    outfile(info.outputPath, ios::binary);
+    writeString(outfile, info.className.c_str());
+    writeString(outfile, info.category.c_str());
+    writeString(outfile, info.shaderName.c_str());
+    writeString(outfile, def.format.c_str());
+    writeHash(outfile, def.vertexHashBinary);
+    writeHash(outfile, def.fragmentHashBinary);
+
+    std::vector<SourceShaderSampler> textures;
+    def.params = ShaderGC::LookupParams(def.params, textures, def.fragmentMetadata);
+
+    int pc = 0;
+    for(const auto& p : def.params)
+        if(p.i != -1)
+            pc++;
+
+    writeInt(outfile, pc);
+    for(const auto& p : def.params)
+    {
+        if(p.i != -1)
+        {
+            writeString(outfile, p.name.c_str());
+            writeInt(outfile, p.buffer);
+            writeInt(outfile, p.size);
+            writeInt(outfile, p.offset);
+            writeFloat(outfile, p.min);
+            writeFloat(outfile, p.max);
+            writeFloat(outfile, p.def);
+            writeFloat(outfile, p.step);
+            writeString(outfile, p.desc.c_str());
+        }
+    }
+
+    writeInt(outfile, textures.size());
+    for(const auto& t : textures)
+    {
+        writeString(outfile, t.name.c_str());
+        writeInt(outfile, t.binding);
+    }
+
+    writeBytes(outfile, def.vertexByteCodeBinary);
+    writeBytes(outfile, def.fragmentByteCodeBinary);
+    outfile.close();
+}
+
 void populateShaderTemplate(SourceShaderDef def, ofstream& log)
 {
+    if(_binary)
+    {
+        populateShaderBinary(def, log);
+        return;
+    }
+
     const auto& info = def.info;
 
     fstream           infile(templatePath / filesystem::path("Shader.template"));
@@ -429,8 +536,24 @@ void populateShaderTemplate(SourceShaderDef def, ofstream& log)
     log << "Generated ShaderDef " << info.outputPath << endl;
 }
 
+void populateTextureBinary(SourceTextureDef def, ofstream& log)
+{
+    const auto& info = def.info;
+
+    ofstream outfile(info.outputPath, ios::binary);
+    writeString(outfile, info.className.c_str());
+    writeBytes(outfile, def.bytes);
+    outfile.close();
+}
+
 void populateTextureTemplate(SourceTextureDef def, ofstream& log)
 {
+    if(_binary)
+    {
+        populateTextureBinary(def, log);
+        return;
+    }
+
     const auto& info = def.info;
 
     fstream           infile(templatePath / filesystem::path("Texture.template"));
@@ -477,9 +600,54 @@ void populateTextureTemplate(SourceTextureDef def, ofstream& log)
     log << "Generated TextureDef " << info.outputPath << endl;
 }
 
+void populatePresetBinary(
+    const filesystem::path& input, const vector<SourceShaderDef>& shaders, const vector<SourceTextureDef>& textures, const vector<SourceShaderParam>& overrides, ofstream& log)
+{
+    const auto& info = getShaderInfo(input, "PresetDef");
+    ofstream    outfile(info.outputPath, ios::binary);
+    writeString(outfile, info.className.c_str());
+    writeString(outfile, info.category.c_str());
+    writeString(outfile, info.shaderName.c_str());
+    writeInt(outfile, shaders.size());
+    for(const auto& s : shaders)
+    {
+        writeString(outfile, s.info.className.c_str());
+        writeInt(outfile, s.presetParams.size());
+        for(const auto& p : s.presetParams)
+        {
+            writeString(outfile, p.first.c_str());
+            writeString(outfile, p.second.c_str());
+        }
+    }
+    writeInt(outfile, textures.size());
+    for(const auto& t : textures)
+    {
+        writeString(outfile, t.info.className.c_str());
+        writeInt(outfile, t.presetParams.size());
+        for(const auto& p : t.presetParams)
+        {
+            writeString(outfile, p.first.c_str());
+            writeString(outfile, p.second.c_str());
+        }
+    }
+    writeInt(outfile, overrides.size());
+    for(const auto& o : overrides)
+    {
+        writeString(outfile, o.name.c_str());
+        writeFloat(outfile, o.def);
+    }
+    outfile.close();
+}
+
 void populatePresetTemplate(
     const filesystem::path& input, const vector<SourceShaderDef>& shaders, const vector<SourceTextureDef>& textures, const vector<SourceShaderParam>& overrides, ofstream& log)
 {
+    if(_binary)
+    {
+        populatePresetBinary(input, shaders, textures, overrides, log);
+        return;
+    }
+
     const auto& info = getShaderInfo(input, "PresetDef");
 
     fstream           infile(templatePath / filesystem::path("Preset.template"));
@@ -683,14 +851,29 @@ void populatePresetTemplate(
     log << "Generated PresetDef " << info.outputPath << endl;
 }
 
+vector<uint8_t> vector32to8(const vector<uint32_t>& d)
+{
+    vector<uint8_t> out;
+    for(const auto& v : d)
+    {
+        out.push_back(v & 255);
+        out.push_back((v >> 8) & 255);
+        out.push_back((v >> 16) & 255);
+        out.push_back((v >> 24) & 255);
+    }
+    return out;
+}
+
 void processShader(SourceShaderDef& def, ofstream& log, bool& warn)
 {
     try
     {
         ShaderGC::ProcessSourceShader(def, log, warn);
 
-        const auto& vertexOutput   = spirv(glsl(def.input, "vert", def.vertexSource, log, warn), "vert", log, warn);
-        const auto& fragmentOutput = spirv(glsl(def.input, "frag", def.fragmentSource, log, warn), "frag", log, warn);
+        const auto& vertexSPIRV    = glsl(def.input, "vert", def.vertexSource, log, warn);
+        const auto& vertexOutput   = spirv(vertexSPIRV.first, "vert", log, warn);
+        const auto& fragmentSPIRV  = glsl(def.input, "frag", def.fragmentSource, log, warn);
+        const auto& fragmentOutput = spirv(fragmentSPIRV.first, "frag", log, warn);
         def.vertexSource           = vertexOutput.first;
         def.vertexMetadata         = vertexOutput.second;
         def.fragmentSource         = fragmentOutput.first;
@@ -700,13 +883,30 @@ void processShader(SourceShaderDef& def, ofstream& log, bool& warn)
         metaOutput.replace_extension(".meta");
         saveSource(metaOutput, fragmentOutput.second);
 
-        auto vertexCode      = fxc(def.input, "vs_5_0", vertexOutput.first, log, warn);
-        auto fragmentCode    = fxc(def.input, "ps_5_0", fragmentOutput.first, log, warn);
-        def.vertexByteCode   = vertexCode.first;
-        def.vertexHash       = vertexCode.second;
-        def.fragmentByteCode = fragmentCode.first;
-        def.fragmentHash     = fragmentCode.second;
-
+        if(_vulkan)
+        {
+            def.vertexByteCodeBinary   = vector32to8(vertexSPIRV.second);
+            def.vertexHashBinary       = vector<uint32_t> {0, 0, 0, 0, 0, 0, 0, 0};
+            def.vertexByteCode         = byteArrayToString(def.vertexByteCodeBinary.data(), def.vertexByteCodeBinary.size());
+            def.vertexHash             = intArrayToString(def.vertexHashBinary.data(), def.vertexHashBinary.size());
+            def.fragmentByteCodeBinary = vector32to8(fragmentSPIRV.second);
+            def.fragmentHashBinary     = vector<uint32_t> {0, 0, 0, 0, 0, 0, 0, 0};
+            def.fragmentByteCode       = byteArrayToString(def.fragmentByteCodeBinary.data(), def.fragmentByteCodeBinary.size());
+            def.fragmentHash           = intArrayToString(def.fragmentHashBinary.data(), def.fragmentHashBinary.size());
+        }
+        else
+        {
+            auto vertexCode            = fxc(def.input, "vs_5_0", vertexOutput.first, log, warn);
+            auto fragmentCode          = fxc(def.input, "ps_5_0", fragmentOutput.first, log, warn);
+            def.vertexByteCode         = std::get<0>(vertexCode);
+            def.vertexHash             = std::get<1>(vertexCode);
+            def.vertexByteCodeBinary   = std::get<2>(vertexCode);
+            def.vertexHashBinary       = std::get<3>(vertexCode);
+            def.fragmentByteCode       = std::get<0>(fragmentCode);
+            def.fragmentHash           = std::get<1>(fragmentCode);
+            def.fragmentByteCodeBinary = std::get<2>(fragmentCode);
+            def.fragmentHashBinary     = std::get<3>(fragmentCode);
+        }
         replace(def.vertexByteCode, " ", "");
         replace(def.vertexHash, " ", "");
         replace(def.fragmentByteCode, " ", "");
@@ -721,17 +921,19 @@ void processShader(SourceShaderDef& def, ofstream& log, bool& warn)
     }
 }
 
-string bin2string(filesystem::path input)
+pair<string, vector<uint8_t>> bin2string(filesystem::path input)
 {
-    ostringstream oss;
-    ifstream      infile(input, fstream::binary);
-    bool          first   = true;
-    int           counter = 0;
+    vector<uint8_t> bytes;
+    ostringstream   oss;
+    ifstream        infile(input, fstream::binary);
+    bool            first   = true;
+    int             counter = 0;
 
     oss << "{";
     char c;
     while(infile.get(c))
     {
+        bytes.push_back(c);
         if(first)
         {
             first = false;
@@ -751,12 +953,14 @@ string bin2string(filesystem::path input)
             break;
     }
     oss << "};";
-    return oss.str();
+    return make_pair(oss.str(), bytes);
 }
 
 void processTexture(SourceTextureDef def, ofstream& log)
 {
-    def.data = bin2string(def.input);
+    const auto& s = bin2string(def.input);
+    def.data      = s.first;
+    def.bytes     = s.second;
     populateTextureTemplate(def, log);
 }
 
@@ -863,10 +1067,10 @@ void processFile(const filesystem::path& input, ofstream& reportStream)
 
 void processListTemplate()
 {
-    listPath /= filesystem::path(string(_libName) + ".h");
+    listPath /= filesystem::path(string(_libName) + (_binary ? ".lst" : ".h"));
     if(!filesystem::exists(listPath))
     {
-        fstream           infile(templatePath / filesystem::path("List.template"));
+        fstream           infile(templatePath / filesystem::path(_binary ? "Binary.template" : "List.template"));
         std::stringstream buffer;
         buffer << infile.rdbuf();
         auto bufferString = buffer.str();
@@ -894,6 +1098,21 @@ int main(int argc, char* argv[])
     reportPath = tempPath / (std::format("{:%Y%m%d_%H%M%S}", std::chrono::system_clock::now()) + ".log");
     ofstream reportStream(reportPath);
     reportStream << "Starting at " << (std::format("{:%Y-%m-%d %H:%M:%S}", std::chrono::system_clock::now())) << endl;
+
+    for(int i = 1; i < argc; i++)
+    {
+        string input(argv[i]);
+        if(input == "-bin" || input == "-binary")
+        {
+            _binary = true;
+            continue;
+        }
+        if(input == "-vulkan")
+        {
+            _vulkan = true;
+            continue;
+        }
+    }
 
     processListTemplate();
 
