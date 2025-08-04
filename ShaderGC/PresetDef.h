@@ -11,6 +11,12 @@ GNU General Public License v3.0
 #include "ShaderDef.h"
 #include "TextureDef.h"
 
+struct OverrideParamDef
+{
+    const char* name;
+    float       value;
+};
+
 class PresetDef
 {
 public:
@@ -18,10 +24,18 @@ public:
 
     virtual void Build() { }
 
-    __declspec(noinline)
-    void OverrideParam(const char* name, float value)
+    __declspec(noinline) void OverrideParam(const char* name, float value)
     {
         Overrides.emplace_back(name, value);
+    }
+
+    __declspec(noinline) void OverrideParams(const OverrideParamDef* params, int numParams)
+    {
+        for(int i = 0; i < numParams; i++)
+        {
+            const OverrideParamDef* p = params + i;
+            Overrides.emplace_back(p->name, p->value);
+        }
     }
 
     void MakeDynamic()

@@ -7,6 +7,25 @@ GNU General Public License v3.0
 
 #pragma once
 
+struct ShaderParamDef
+{
+    const char* name;
+    int         buffer;
+    int         offset;
+    int         size;
+    float       minValue;
+    float       maxValue;
+    float       defaultValue;
+    float       stepValue;
+    const char* description;
+};
+
+struct PresetParamDef
+{
+    const char* key;
+    const char* value;
+};
+
 struct ShaderParam
 {
     ShaderParam(const char* name, int buffer, int offset, int size, float minValue, float maxValue, float defaultValue, float stepValue = 0.0f, const char* description = "") :
@@ -78,14 +97,22 @@ public:
         return maxLen;
     }
 
-    __declspec(noinline)
-    void AddParam(const char* name, int buffer, int offset, int size, float minValue, float maxValue, float defaultValue, float stepValue = 0.0f, const char* description = "")
+    __declspec(noinline) void AddParams(const ShaderParamDef* paramDefs, int numParams)
+    {
+        for(int i = 0; i < numParams; i++)
+        {
+            const ShaderParamDef* p = paramDefs + i;
+            AddParam(p->name, p->buffer, p->offset, p->size, p->minValue, p->maxValue, p->defaultValue, p->stepValue, p->description);
+        }
+    }
+
+    __declspec(noinline) void
+    AddParam(const char* name, int buffer, int offset, int size, float minValue, float maxValue, float defaultValue, float stepValue = 0.0f, const char* description = "")
     {
         Params.emplace_back(name, buffer, offset, size, minValue, maxValue, defaultValue, stepValue, description);
     }
 
-    __declspec(noinline)
-    void AddSampler(const char* name, int binding)
+    __declspec(noinline) void AddSampler(const char* name, int binding)
     {
         Samplers.emplace_back(name, binding);
     }
@@ -93,6 +120,17 @@ public:
     ShaderDef& Param(const char* presetKey, const char* presetValue)
     {
         PresetParams.insert(std::make_pair(std::string(presetKey), std::string(presetValue)));
+        return *this;
+    }
+    
+    __declspec(noinline) ShaderDef& WithParams(const PresetParamDef* paramDefs, int numParams)
+    {
+        for(int i = 0; i < numParams; i++)
+        {
+            const PresetParamDef* p = paramDefs + i;
+            PresetParams.insert(std::make_pair(std::string(p->key), std::string(p->value)));
+        }
+
         return *this;
     }
 

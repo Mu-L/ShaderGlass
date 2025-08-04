@@ -4,6 +4,15 @@
 
 #pragma once
 
+namespace %LIB_NAME%%CLASS_NAME%PresetDefs
+{
+%PARAMS% static constexpr PresetParamDef sParamDefs%SHADER_NO%[] = { %PRESET_PARAMS% };
+
+%TEXTURES_PARAMS% static constexpr TextureParamDef sTextureParams%TEXTURE_NO%[] = { %TEXTURE_PARAMS% };
+
+%OVERRIDES% static constexpr OverrideParamDef sOverrideDefs[] = { %PRESET_OVERRIDES% };
+}
+
 namespace %LIB_NAME%
 {
 class %CLASS_NAME%PresetDef : public PresetDef
@@ -16,9 +25,9 @@ public:
 	}
 
 	void Build() {
-%SHADERS%	ShaderDefs.push_back(%SHADER_NAME%ShaderDef()%PRESET_PARAMS%);
-%TEXTURES%  TextureDefs.push_back(%TEXTURE_NAME%TextureDef()%TEXTURE_PARAMS%);
-%OVERRIDES% OverrideParam("%OVERRIDE_NAME%", (float)%OVERRIDE_VALUE%);
+%SHADERS%	ShaderDefs.push_back(%SHADER_NAME%ShaderDef().WithParams(%LIB_NAME%%CLASS_NAME%PresetDefs::sParamDefs%SHADER_NO%, sizeof(%LIB_NAME%%CLASS_NAME%PresetDefs::sParamDefs%SHADER_NO%) / sizeof(PresetParamDef)));
+%TEXTURES%	TextureDefs.push_back(%TEXTURE_NAME%TextureDef().WithParams(%LIB_NAME%%CLASS_NAME%PresetDefs::sTextureParams%TEXTURE_NO%, sizeof(%LIB_NAME%%CLASS_NAME%PresetDefs::sTextureParams%TEXTURE_NO%) / sizeof(TextureParamDef)));
+%OVERRIDE%	OverrideParams(%LIB_NAME%%CLASS_NAME%PresetDefs::sOverrideDefs, sizeof(%LIB_NAME%%CLASS_NAME%PresetDefs::sOverrideDefs) / sizeof(OverrideParamDef));
 	}
 };
 }

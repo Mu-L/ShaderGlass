@@ -7,6 +7,12 @@ GNU General Public License v3.0
 
 #pragma once
 
+struct TextureParamDef
+{
+    const char* key;
+    const char* value;
+};
+
 class TextureDef
 {
 public:
@@ -21,6 +27,17 @@ public:
     TextureDef& Param(const char* presetKey, const char* presetValue)
     {
         PresetParams.insert(std::make_pair(std::string(presetKey), std::string(presetValue)));
+        return *this;
+    }
+
+    __declspec(noinline) TextureDef& WithParams(const TextureParamDef* paramDefs, int numParams)
+    {
+        for(int i = 0; i < numParams; i++)
+        {
+            const TextureParamDef* p = paramDefs + i;
+            PresetParams.insert(std::make_pair(std::string(p->key), std::string(p->value)));
+        }
+
         return *this;
     }
 

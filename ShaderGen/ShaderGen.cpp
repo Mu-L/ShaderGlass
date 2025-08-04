@@ -499,16 +499,90 @@ void populatePresetTemplate(
         getline(iss, line, '\n');
         if(line == "\"\"")
             continue;
-        if(line.starts_with("%SHADERS%"))
+        if(line.starts_with("%PARAMS%"))
+        {
+            replace(line, "%PARAMS%", "         ");
+
+            int no = 0;
+            for(const auto& s : shaders)
+            {
+                string paramsLine(line);
+                replace(paramsLine, "%SHADER_NAME%", s.info.className);
+
+                // append preset params
+                stringstream paramsLines;
+                if(s.presetParams.size())
+                {
+                    for(const auto& pp : s.presetParams)
+                    {
+                        string paramLine("PresetParamDef { .key = \"%PRESET_KEY%\", .value = \"%PRESET_VALUE%\" },");
+                        replace(paramLine, "%PRESET_KEY%", pp.first);
+                        replace(paramLine, "%PRESET_VALUE%", pp.second);
+                        paramsLines << endl << paramLine;
+                    }
+                }
+                else
+                {
+                    // dummy
+                    string paramLine("PresetParamDef { .key = \"%PRESET_KEY%\", .value = \"%PRESET_VALUE%\" },");
+                    replace(paramLine, "%PRESET_KEY%", "dummy");
+                    replace(paramLine, "%PRESET_VALUE%", "");
+                    paramsLines << endl << paramLine;
+                }
+                replace(paramsLine, "%SHADER_NO%", std::to_string(no));
+                replace(paramsLine, "%PRESET_PARAMS%", paramsLines.str());
+                outfile << paramsLine << endl;
+                no++;
+            }
+        }
+        else if(line.starts_with("%TEXTURES_PARAMS%"))
+        {
+            replace(line, "%TEXTURES_PARAMS%", "         ");
+
+            int no = 0;
+            for(const auto& t : textures)
+            {
+                string paramsLine(line);
+                //replace(paramsLine, "%SHADER_NAME%", s.info.className);
+
+                // append preset params
+                stringstream paramsLines;
+                if(t.presetParams.size())
+                {
+                    for(const auto& pp : t.presetParams)
+                    {
+                        string paramLine("TextureParamDef { .key = \"%PRESET_KEY%\", .value = \"%PRESET_VALUE%\" },");
+                        replace(paramLine, "%PRESET_KEY%", pp.first);
+                        replace(paramLine, "%PRESET_VALUE%", pp.second);
+                        paramsLines << endl << paramLine;
+                    }
+                }
+                else
+                {
+                    // dummy
+                    string paramLine("TextureParamDef { .key = \"%PRESET_KEY%\", .value = \"%PRESET_VALUE%\" },");
+                    replace(paramLine, "%PRESET_KEY%", "dummy");
+                    replace(paramLine, "%PRESET_VALUE%", "");
+                    paramsLines << endl << paramLine;
+                }
+                replace(paramsLine, "%TEXTURE_NO%", std::to_string(no));
+                replace(paramsLine, "%TEXTURE_PARAMS%", paramsLines.str());
+                outfile << paramsLine << endl;
+                no++;
+            }
+        }
+        else if(line.starts_with("%SHADERS%"))
         {
             replace(line, "%SHADERS%", "         ");
 
+            int no = 0;
             for(const auto& s : shaders)
             {
                 string shaderLine(line);
                 replace(shaderLine, "%SHADER_NAME%", s.info.className);
 
                 // append preset params
+                /*
                 stringstream paramsLines;
                 for(const auto& pp : s.presetParams)
                 {
@@ -516,21 +590,25 @@ void populatePresetTemplate(
                     replace(paramLine, "%PRESET_KEY%", pp.first);
                     replace(paramLine, "%PRESET_VALUE%", pp.second);
                     paramsLines << endl << paramLine;
-                }
-                replace(shaderLine, "%PRESET_PARAMS%", paramsLines.str());
+                }*/
+                replace(shaderLine, "%SHADER_NO%", std::to_string(no));
+                //replace(shaderLine, "%PRESET_PARAMS%", paramsLines.str());
                 outfile << shaderLine << endl;
+                no++;
             }
         }
         else if(line.starts_with("%TEXTURES%"))
         {
             replace(line, "%TEXTURES%", "          ");
 
+            int no = 0;
             for(const auto& t : textures)
             {
                 string textureLine(line);
                 replace(textureLine, "%TEXTURE_NAME%", t.info.className);
 
                 // append preset params
+                /*
                 stringstream paramsLines;
                 for(const auto& pp : t.presetParams)
                 {
@@ -538,21 +616,39 @@ void populatePresetTemplate(
                     replace(paramLine, "%PRESET_KEY%", pp.first);
                     replace(paramLine, "%PRESET_VALUE%", pp.second);
                     paramsLines << endl << paramLine;
-                }
-                replace(textureLine, "%TEXTURE_PARAMS%", paramsLines.str());
+                }*/
+                replace(textureLine, "%TEXTURE_NO%", std::to_string(no));
+                //replace(textureLine, "%TEXTURE_PARAMS%", paramsLines.str());
                 outfile << textureLine << endl;
+                no++;
             }
         }
         else if(line.starts_with("%OVERRIDES%"))
         {
-            replace(line, "%OVERRIDES%", "           ");
-
-            for(const auto& o : overrides)
+            if(overrides.size())
             {
-                string overrideLine(line);
-                replace(overrideLine, "%OVERRIDE_NAME%", o.name);
-                replace(overrideLine, "%OVERRIDE_VALUE%", to_string(o.def));
-                outfile << overrideLine << endl;
+                replace(line, "%OVERRIDES%", "           ");
+
+                string       overridesLine(line);
+                stringstream overridesLines;
+                for(const auto& o : overrides)
+                {
+                    string overrideLine("OverrideParamDef { .name = \"%OVERRIDE_NAME%\", .value = %OVERRIDE_VALUE%f },");
+                    replace(overrideLine, "%OVERRIDE_NAME%", o.name);
+                    replace(overrideLine, "%OVERRIDE_VALUE%", to_string(o.def));
+                    overridesLines << endl << overrideLine;
+                }
+                replace(overridesLine, "%PRESET_OVERRIDES%", overridesLines.str());
+                outfile << overridesLine << endl;
+            }
+        }
+        else if(line.starts_with("%OVERRIDE%"))
+        {
+            if(overrides.size())
+            {
+                replace(line, "%OVERRIDE%", "           ");
+
+                outfile << line << endl;
             }
         }
         else if(line.starts_with("%HEADER"))

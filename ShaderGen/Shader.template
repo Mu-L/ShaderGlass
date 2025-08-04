@@ -17,6 +17,10 @@ static const uint32_t sVertexHash[] =
 
 static const uint32_t sFragmentHash[] =
 %FRAGMENT_HASH%
+
+static constexpr ShaderParamDef sParamDefs[] = {
+%PARAM%		ShaderParamDef { .name = "%PARAM_NAME%", .buffer = %PARAM_BUFFER%, .offset = %PARAM_OFFSET%, .size = %PARAM_SIZE%, .minValue = %PARAM_MIN%f, .maxValue = %PARAM_MAX%f, .defaultValue = %PARAM_DEF%f, .stepValue = %PARAM_STEP%f, .description = "%PARAM_DESC%" },
+};
 }
 
 namespace %LIB_NAME%
@@ -34,7 +38,7 @@ public:
 		FragmentLength = sizeof(%LIB_NAME%%CLASS_NAME%ShaderDefs::sFragmentByteCode);
 		FragmentHash = %LIB_NAME%%CLASS_NAME%ShaderDefs::sFragmentHash;
 		Format = "%SHADER_FORMAT%";
-%PARAM%		AddParam("%PARAM_NAME%", %PARAM_BUFFER%, %PARAM_OFFSET%, %PARAM_SIZE%, %PARAM_MIN%f, %PARAM_MAX%f, %PARAM_DEF%f, %PARAM_STEP%f, "%PARAM_DESC%");
+		AddParams(%LIB_NAME%%CLASS_NAME%ShaderDefs::sParamDefs, sizeof(%LIB_NAME%%CLASS_NAME%ShaderDefs::sParamDefs) / sizeof(ShaderParamDef));
 %TEXTURE%		AddSampler("%TEXTURE_NAME%", %TEXTURE_BINDING%);
 /*
 VertexSource = %*VERTEX_SOURCE*%;
