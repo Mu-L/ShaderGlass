@@ -81,8 +81,8 @@ void ShaderGlass::Initialize(HWND                                outputWindow,
     m_lastSize.x = clientRect.right;
     m_lastSize.y = clientRect.bottom;
 
-    m_prevTicks          = GetTicks();
-    m_startTicks         = GetTicks();
+    m_prevTicks          = 0;
+    m_startTicks         = 0;
     m_prevLogicalFrameNo = 0;
     m_prevSubFrameNo     = 0;
 
@@ -430,10 +430,18 @@ void ShaderGlass::PresentFrame()
 void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG frameTicks, int inputFrameNo)
 {
     auto nowTicks            = GetTicks();
+    if(m_startTicks == 0)
+    {
+        // sync to VSync
+        PresentFrame();
+        m_startTicks = GetTicks() - (REFERENCE_FRAME_TIME/2);
+        m_prevTicks = m_startTicks;
+        return;
+    }
     auto timeSinceLastRender = nowTicks - m_prevRenderTicks;
-    auto fractionalFrameNo   = (nowTicks - m_startTicks) / (16.6666666f * m_subFrames);
-    auto logicalFrameNo      = (int)floorf(fractionalFrameNo); // fix shaders at 60 fps
-    auto subFrameNo          = m_subFrames > 1 ? ((int)floorf((fractionalFrameNo - floorf(fractionalFrameNo)) * m_subFrames) % m_subFrames) + 1 : 0;
+    auto fractionalFrameNo   = (nowTicks - m_startTicks) / (REFERENCE_FRAME_TIME * m_subFrames);
+    auto logicalFrameNo      = (int)floor(fractionalFrameNo); // fix shaders at 60 fps
+    auto subFrameNo          = m_subFrames > 1 ? ((int)floor((fractionalFrameNo - floor(fractionalFrameNo)) * m_subFrames) % m_subFrames) + 1 : 0;
 
     // same input
     if(inputFrameNo == m_prevInputFrameNo)
@@ -645,7 +653,7 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
 
     if(m_newShaderPreset || m_verticalUpdated)
     {
-        m_startTicks = GetTicks(); // reset logical frame no
+        m_startTicks = 0; // reset logical frame no
 
         DestroyShaders();
         if(m_newShaderPreset)
@@ -1167,11 +1175,11 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
 
     m_renderCounter++;
     m_prevRenderTicks = GetTicks();
-    if(m_prevRenderTicks - m_prevTicks > 1000)
+    if(m_prevRenderTicks - m_prevTicks > TICKS_PER_SEC)
     {
         auto deltaTicks     = m_prevRenderTicks - m_prevTicks;
         auto deltaFrames    = m_renderCounter - m_prevRenderCounter;
-        m_fps               = deltaFrames * 1000.0f / deltaTicks;
+        m_fps               = deltaFrames * (float)TICKS_PER_SEC / deltaTicks;
         m_prevRenderCounter = m_renderCounter;
         m_prevTicks         = m_prevRenderTicks;
     }

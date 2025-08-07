@@ -109,11 +109,11 @@ void CaptureSession::OnInputFrame()
 {
     m_frameTicks = GetTicks();
     m_numInputFrames++;
-    if(m_frameTicks - m_prevTicks > 1000)
+    if(m_frameTicks - m_prevTicks > TICKS_PER_SEC)
     {
         auto deltaTicks   = m_frameTicks - m_prevTicks;
         auto deltaFrames  = m_numInputFrames - m_prevInputFrames;
-        m_fps             = deltaFrames * 1000.0f / deltaTicks;
+        m_fps             = deltaFrames * (float)TICKS_PER_SEC / deltaTicks;
         m_prevInputFrames = m_numInputFrames;
         m_prevTicks       = m_frameTicks;
     }

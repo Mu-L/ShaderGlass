@@ -2900,6 +2900,7 @@ void ShaderWindow::Start(_In_ LPWSTR lpCmdLine, HWND paramsWindow, HWND browserW
     m_inputDialog.reset(new InputDialog(m_instance, m_mainWindow));
     m_cropDialog.reset(new CropDialog(m_instance, m_mainWindow));
     m_hotkeyDialog.reset(new HotkeyDialog(m_instance, m_mainWindow));
+    GetTicks();
 
     if(autoStart && HasCaptureAPI())
     {

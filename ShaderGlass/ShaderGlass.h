@@ -93,12 +93,12 @@ private:
     bool       m_useHDR {false};
     int        m_frameCounter {0};
     int        m_logicalFrameCounter {0};
-    ULONGLONG  m_startTicks {0};
+    int32_t    m_startTicks {0};
     int        m_renderCounter {0};
     int        m_prevRenderCounter {0};
-    ULONGLONG  m_prevRenderTicks {0};
-    ULONGLONG  m_prevTicks {0};
-    ULONGLONG  m_prevFrameTicks {0};
+    int32_t    m_prevRenderTicks {0};
+    int32_t    m_prevTicks {0};
+    int32_t    m_prevFrameTicks {0};
     int        m_prevInputFrameNo {0};
     int        m_prevLogicalFrameNo {0};
     int        m_prevSubFrameNo {0};

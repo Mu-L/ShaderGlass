@@ -9,6 +9,9 @@ GNU General Public License v3.0
 
 #define MAX_WINDOW_TITLE 200
 #define MAX_DEVICE_NAME 200
+#define TICKS_PER_SEC 10000
+#define REFERENCE_FPS 60.0
+#define REFERENCE_FRAME_TIME (TICKS_PER_SEC / REFERENCE_FPS)
 
 wchar_t*     convertCharArrayToLPCWSTR(const char* charArray);
 BOOL         IsAltTabWindow(HWND hwnd);
@@ -18,4 +21,4 @@ bool         Is1903();
 bool         CanDisableBorder();
 bool         CanSetCaptureRate();
 bool         CanUpdateCursor();
-int64_t      GetTicks();
+int32_t      GetTicks();
