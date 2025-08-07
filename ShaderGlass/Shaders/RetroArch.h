@@ -922,6 +922,13 @@
 #include "RetroArch\vhs\shaders\vhs_mpalko\VhsShadersVhs_mpalkoVhs_mpalko_pass0ShaderDef.h"
 #include "RetroArch\vhs\shaders\vhs_mpalko\VhsShadersVhs_mpalkoVhs_mpalko_pass1ShaderDef.h"
 #include "RetroArch\warp\shaders\WarpShadersDilationShaderDef.h"
+#include "RetroArch\subframe-bfi\shaders\SubframeBfiShaders120hzSafeBFIShaderDef.h"
+#include "RetroArch\subframe-bfi\shaders\120hz-smart-BFI\SubframeBfiShaders120hzSmartBFICalculationsShaderDef.h"
+#include "RetroArch\subframe-bfi\shaders\120hz-smart-BFI\SubframeBfiShaders120hzSmartBFIBfi_flickerShaderDef.h"
+#include "RetroArch\subframe-bfi\shaders\SubframeBfiShadersAdaptive_strobeKokoShaderDef.h"
+#include "RetroArch\subframe-bfi\shaders\SubframeBfiShadersBfiSimpleShaderDef.h"
+#include "RetroArch\subframe-bfi\shaders\SubframeBfiShadersCrtBeamSimulatorShaderDef.h"
+#include "RetroArch\subframe-bfi\shaders\motionblur_test\shaders\SubframeBfiShadersMotionblur_testShadersMotionblur_testShaderDef.h"
 // %SHADER_INCLUDE%
 
 #include "RetroArch\anti-aliasing\shaders\smaa\AntiAliasingShadersSmaaAreaTexTextureDef.h"
@@ -1160,6 +1167,10 @@
 #include "RetroArch\reshade\shaders\magicbloom\ReshadeShadersMagicbloomMagicBloom_DirtTextureDef.h"
 #include "RetroArch\reshade\shaders\NormalsDisplacement\ReshadeShadersNormalsDisplacementCurveNormalsTextureDef.h"
 #include "RetroArch\stereoscopic-3d\shaders\fubax_vr\Stereoscopic3dShadersFubax_vrNoseTextureDef.h"
+#include "RetroArch\subframe-bfi\shaders\motionblur_test\resources\SubframeBfiShadersMotionblur_testResources60TextureDef.h"
+#include "RetroArch\subframe-bfi\shaders\motionblur_test\resources\SubframeBfiShadersMotionblur_testResources120TextureDef.h"
+#include "RetroArch\subframe-bfi\shaders\motionblur_test\resources\SubframeBfiShadersMotionblur_testResources180TextureDef.h"
+#include "RetroArch\subframe-bfi\shaders\motionblur_test\resources\SubframeBfiShadersMotionblur_testResources240TextureDef.h"
 // %TEXTURE_INCLUDE%
 
 #include "RetroArch\anamorphic\AnamorphicAnamorphicPresetDef.h"
@@ -3235,6 +3246,12 @@
 #include "RetroArch\vhs\VhsVhs_and_crt_godotPresetDef.h"
 #include "RetroArch\vhs\VhsVhs_mpalkoPresetDef.h"
 #include "RetroArch\warp\WarpDilationPresetDef.h"
+#include "RetroArch\subframe-bfi\SubframeBfi120hzSafeBFIPresetDef.h"
+#include "RetroArch\subframe-bfi\SubframeBfi120hzSmartBFIPresetDef.h"
+#include "RetroArch\subframe-bfi\SubframeBfiAdaptive_strobeKokoPresetDef.h"
+#include "RetroArch\subframe-bfi\SubframeBfiBfiSimplePresetDef.h"
+#include "RetroArch\subframe-bfi\SubframeBfiCrtBeamSimulatorPresetDef.h"
+#include "RetroArch\subframe-bfi\SubframeBfiMotionblur_testPresetDef.h"
 // %PRESET_INCLUDE%
 
 namespace RetroArch
@@ -5313,6 +5330,12 @@ new VhsVHSProPresetDef(),
 new VhsVhs_and_crt_godotPresetDef(),
 new VhsVhs_mpalkoPresetDef(),
 new WarpDilationPresetDef(),
+new SubframeBfi120hzSafeBFIPresetDef(),
+new SubframeBfi120hzSmartBFIPresetDef(),
+new SubframeBfiAdaptive_strobeKokoPresetDef(),
+new SubframeBfiBfiSimplePresetDef(),
+new SubframeBfiCrtBeamSimulatorPresetDef(),
+new SubframeBfiMotionblur_testPresetDef(),
 // %PRESET_CLASS%
 };
 
@@ -6240,6 +6263,13 @@ std::vector<CachedShader> CachedShaders() {
  cached.emplace_back(RetroArchVhsShadersVhs_mpalkoVhs_mpalko_pass0ShaderDefs::sVertexHash, RetroArchVhsShadersVhs_mpalkoVhs_mpalko_pass0ShaderDefs::sVertexByteCode, sizeof(RetroArchVhsShadersVhs_mpalkoVhs_mpalko_pass0ShaderDefs::sVertexByteCode)); cached.emplace_back(RetroArchVhsShadersVhs_mpalkoVhs_mpalko_pass0ShaderDefs::sFragmentHash, RetroArchVhsShadersVhs_mpalkoVhs_mpalko_pass0ShaderDefs::sFragmentByteCode, sizeof(RetroArchVhsShadersVhs_mpalkoVhs_mpalko_pass0ShaderDefs::sFragmentByteCode));
  cached.emplace_back(RetroArchVhsShadersVhs_mpalkoVhs_mpalko_pass1ShaderDefs::sVertexHash, RetroArchVhsShadersVhs_mpalkoVhs_mpalko_pass1ShaderDefs::sVertexByteCode, sizeof(RetroArchVhsShadersVhs_mpalkoVhs_mpalko_pass1ShaderDefs::sVertexByteCode)); cached.emplace_back(RetroArchVhsShadersVhs_mpalkoVhs_mpalko_pass1ShaderDefs::sFragmentHash, RetroArchVhsShadersVhs_mpalkoVhs_mpalko_pass1ShaderDefs::sFragmentByteCode, sizeof(RetroArchVhsShadersVhs_mpalkoVhs_mpalko_pass1ShaderDefs::sFragmentByteCode));
  cached.emplace_back(RetroArchWarpShadersDilationShaderDefs::sVertexHash, RetroArchWarpShadersDilationShaderDefs::sVertexByteCode, sizeof(RetroArchWarpShadersDilationShaderDefs::sVertexByteCode)); cached.emplace_back(RetroArchWarpShadersDilationShaderDefs::sFragmentHash, RetroArchWarpShadersDilationShaderDefs::sFragmentByteCode, sizeof(RetroArchWarpShadersDilationShaderDefs::sFragmentByteCode));
+ cached.emplace_back(RetroArchSubframeBfiShaders120hzSafeBFIShaderDefs::sVertexHash, RetroArchSubframeBfiShaders120hzSafeBFIShaderDefs::sVertexByteCode, sizeof(RetroArchSubframeBfiShaders120hzSafeBFIShaderDefs::sVertexByteCode)); cached.emplace_back(RetroArchSubframeBfiShaders120hzSafeBFIShaderDefs::sFragmentHash, RetroArchSubframeBfiShaders120hzSafeBFIShaderDefs::sFragmentByteCode, sizeof(RetroArchSubframeBfiShaders120hzSafeBFIShaderDefs::sFragmentByteCode));
+ cached.emplace_back(RetroArchSubframeBfiShaders120hzSmartBFICalculationsShaderDefs::sVertexHash, RetroArchSubframeBfiShaders120hzSmartBFICalculationsShaderDefs::sVertexByteCode, sizeof(RetroArchSubframeBfiShaders120hzSmartBFICalculationsShaderDefs::sVertexByteCode)); cached.emplace_back(RetroArchSubframeBfiShaders120hzSmartBFICalculationsShaderDefs::sFragmentHash, RetroArchSubframeBfiShaders120hzSmartBFICalculationsShaderDefs::sFragmentByteCode, sizeof(RetroArchSubframeBfiShaders120hzSmartBFICalculationsShaderDefs::sFragmentByteCode));
+ cached.emplace_back(RetroArchSubframeBfiShaders120hzSmartBFIBfi_flickerShaderDefs::sVertexHash, RetroArchSubframeBfiShaders120hzSmartBFIBfi_flickerShaderDefs::sVertexByteCode, sizeof(RetroArchSubframeBfiShaders120hzSmartBFIBfi_flickerShaderDefs::sVertexByteCode)); cached.emplace_back(RetroArchSubframeBfiShaders120hzSmartBFIBfi_flickerShaderDefs::sFragmentHash, RetroArchSubframeBfiShaders120hzSmartBFIBfi_flickerShaderDefs::sFragmentByteCode, sizeof(RetroArchSubframeBfiShaders120hzSmartBFIBfi_flickerShaderDefs::sFragmentByteCode));
+ cached.emplace_back(RetroArchSubframeBfiShadersAdaptive_strobeKokoShaderDefs::sVertexHash, RetroArchSubframeBfiShadersAdaptive_strobeKokoShaderDefs::sVertexByteCode, sizeof(RetroArchSubframeBfiShadersAdaptive_strobeKokoShaderDefs::sVertexByteCode)); cached.emplace_back(RetroArchSubframeBfiShadersAdaptive_strobeKokoShaderDefs::sFragmentHash, RetroArchSubframeBfiShadersAdaptive_strobeKokoShaderDefs::sFragmentByteCode, sizeof(RetroArchSubframeBfiShadersAdaptive_strobeKokoShaderDefs::sFragmentByteCode));
+ cached.emplace_back(RetroArchSubframeBfiShadersBfiSimpleShaderDefs::sVertexHash, RetroArchSubframeBfiShadersBfiSimpleShaderDefs::sVertexByteCode, sizeof(RetroArchSubframeBfiShadersBfiSimpleShaderDefs::sVertexByteCode)); cached.emplace_back(RetroArchSubframeBfiShadersBfiSimpleShaderDefs::sFragmentHash, RetroArchSubframeBfiShadersBfiSimpleShaderDefs::sFragmentByteCode, sizeof(RetroArchSubframeBfiShadersBfiSimpleShaderDefs::sFragmentByteCode));
+ cached.emplace_back(RetroArchSubframeBfiShadersCrtBeamSimulatorShaderDefs::sVertexHash, RetroArchSubframeBfiShadersCrtBeamSimulatorShaderDefs::sVertexByteCode, sizeof(RetroArchSubframeBfiShadersCrtBeamSimulatorShaderDefs::sVertexByteCode)); cached.emplace_back(RetroArchSubframeBfiShadersCrtBeamSimulatorShaderDefs::sFragmentHash, RetroArchSubframeBfiShadersCrtBeamSimulatorShaderDefs::sFragmentByteCode, sizeof(RetroArchSubframeBfiShadersCrtBeamSimulatorShaderDefs::sFragmentByteCode));
+ cached.emplace_back(RetroArchSubframeBfiShadersMotionblur_testShadersMotionblur_testShaderDefs::sVertexHash, RetroArchSubframeBfiShadersMotionblur_testShadersMotionblur_testShaderDefs::sVertexByteCode, sizeof(RetroArchSubframeBfiShadersMotionblur_testShadersMotionblur_testShaderDefs::sVertexByteCode)); cached.emplace_back(RetroArchSubframeBfiShadersMotionblur_testShadersMotionblur_testShaderDefs::sFragmentHash, RetroArchSubframeBfiShadersMotionblur_testShadersMotionblur_testShaderDefs::sFragmentByteCode, sizeof(RetroArchSubframeBfiShadersMotionblur_testShadersMotionblur_testShaderDefs::sFragmentByteCode));
 // %SHADER_CACHE%
     return cached;
 }

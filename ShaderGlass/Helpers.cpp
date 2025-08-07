@@ -108,3 +108,24 @@ bool CanUpdateCursor()
         return false;
     }
 }
+
+int64_t GetTicks()
+{
+    static LARGE_INTEGER freq {.QuadPart = 0};
+    if(freq.QuadPart == 0)
+    {
+        QueryPerformanceFrequency(&freq);
+    }
+
+    LARGE_INTEGER ticks;
+    if(!QueryPerformanceCounter(&ticks))
+    {
+        winrt::throw_last_error();
+    }
+
+    if(freq.QuadPart == 0)
+    {
+        return GetTickCount64();
+    }
+    return (int64_t)(1000.0 * ticks.QuadPart / (double)freq.QuadPart);
+}

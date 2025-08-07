@@ -158,6 +158,7 @@ bool CaptureManager::StartSession()
     UpdateLockedArea();
     UpdateCroppedArea();
     UpdateVertical();
+    UpdateSubFrames();
 
     if(m_options.imageFile.size())
     {
@@ -425,6 +426,14 @@ void CaptureManager::UpdateVertical()
     {
         m_shaderGlass->SetVertical(m_options.vertical);
         UpdateOutputSize();
+    }
+}
+
+void CaptureManager::UpdateSubFrames()
+{
+    if(m_shaderGlass)
+    {
+        m_shaderGlass->SetSubFrames(m_options.subFrames);
     }
 }
 

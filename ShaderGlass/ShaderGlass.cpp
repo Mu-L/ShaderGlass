@@ -9,6 +9,7 @@ GNU General Public License v3.0
 #include "ShaderGlass.h"
 #include "ShaderList.h"
 #include "CursorEmulator.h"
+#include "Helpers.h"
 #include "resource.h"
 
 static HRESULT     hr;
@@ -80,9 +81,10 @@ void ShaderGlass::Initialize(HWND                                outputWindow,
     m_lastSize.x = clientRect.right;
     m_lastSize.y = clientRect.bottom;
 
-    m_prevTicks          = GetTickCount64();
-    m_startTicks         = GetTickCount64();
+    m_prevTicks          = GetTicks();
+    m_startTicks         = GetTicks();
     m_prevLogicalFrameNo = 0;
+    m_prevSubFrameNo     = 0;
 
     // create swapchain
     {
@@ -171,7 +173,8 @@ void ShaderGlass::RebuildShaders()
     m_shaderPasses.reserve(m_shaderPreset->m_shaders.size() + (m_vertical ? 1 : 0));
     for(auto& shader : m_shaderPreset->m_shaders)
     {
-        m_shaderPasses.emplace_back(shader, *m_shaderPreset, m_device, m_context);
+        auto& pass = m_shaderPasses.emplace_back(shader, *m_shaderPreset, m_device, m_context);
+        pass.UpdateSubFrames(m_subFrames);
     }
     if(m_vertical)
     {
@@ -257,6 +260,15 @@ void ShaderGlass::SetVertical(bool vertical)
     }
 }
 
+void ShaderGlass::SetSubFrames(unsigned subFrames)
+{
+    if(m_subFrames != subFrames)
+    {
+        m_subFrames        = subFrames;
+        m_subFramesUpdated = true;
+    }
+}
+
 void ShaderGlass::DestroyTargets()
 {
     if(m_preprocessedRenderTarget != nullptr)
@@ -272,7 +284,7 @@ void ShaderGlass::UpdateParams()
     for(auto& s : m_shaderPreset->m_shaders)
         for(auto& p : s.Params())
         {
-            if(p->size == 4 && p->name != "FrameCount")
+            if(p->size == 4 && p->name != "FrameCount" && p->name != "CurrentSubFrame" && p->name != "TotalSubFrames")
                 s.SetParam(p, &p->currentValue);
         }
 }
@@ -294,7 +306,7 @@ void ShaderGlass::ResetParams()
     for(auto& s : m_shaderPreset->m_shaders)
         for(auto& p : s.Params())
         {
-            if(p->size == 4 && p->name != "FrameCount")
+            if(p->size == 4 && p->name != "FrameCount" && p->name != "CurrentSubFrame" && p->name != "TotalSubFrames")
             {
                 // check for preset override
                 auto hasOverride = false;
@@ -322,7 +334,7 @@ std::vector<std::tuple<int, ShaderParam*>> ShaderGlass::Params()
     for(auto& s : m_shaderPreset->m_shaders)
     {
         for(auto& p : s.Params())
-            if(p->size == 4 && p->name != "FrameCount")
+            if(p->size == 4 && p->name != "FrameCount" && p->name != "CurrentSubFrame" && p->name != "TotalSubFrames")
                 params.push_back(std::make_tuple(i, p));
 
         i++;
@@ -417,19 +429,21 @@ void ShaderGlass::PresentFrame()
 
 void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG frameTicks, int inputFrameNo)
 {
-    auto nowTicks            = GetTickCount64();
+    auto nowTicks            = GetTicks();
     auto timeSinceLastRender = nowTicks - m_prevRenderTicks;
-    auto logicalFrameNo      = (int)roundf((nowTicks - m_startTicks) / 16.6666666f); // fix shaders at 60 fps
+    auto fractionalFrameNo   = (nowTicks - m_startTicks) / (16.6666666f * m_subFrames);
+    auto logicalFrameNo      = (int)floorf(fractionalFrameNo); // fix shaders at 60 fps
+    auto subFrameNo          = m_subFrames > 1 ? ((int)floorf((fractionalFrameNo - floorf(fractionalFrameNo)) * m_subFrames) % m_subFrames) + 1 : 0;
 
     // same input
     if(inputFrameNo == m_prevInputFrameNo)
     {
-        if(logicalFrameNo == m_prevLogicalFrameNo)
+        if(logicalFrameNo == m_prevLogicalFrameNo && subFrameNo == m_prevSubFrameNo)
             return;
 
-        auto timeSinceLastInput = nowTicks - frameTicks;
-        if(timeSinceLastInput < 20) // 3.3 ms delay allowance for frame timing
-            return;
+        //        auto timeSinceLastInput = nowTicks - frameTicks;
+        //      if(timeSinceLastInput < 20) // 3.3 ms delay allowance for frame timing
+        //        return;
     }
 
     if(m_frameSkip > 0)
@@ -445,6 +459,7 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
     m_prevFrameTicks     = frameTicks;
     m_prevInputFrameNo   = inputFrameNo;
     m_prevLogicalFrameNo = logicalFrameNo;
+    m_prevSubFrameNo     = subFrameNo;
 
     if(!m_running || !texture)
     {
@@ -630,7 +645,7 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
 
     if(m_newShaderPreset || m_verticalUpdated)
     {
-        m_startTicks = GetTickCount64(); // reset logical frame no
+        m_startTicks = GetTicks(); // reset logical frame no
 
         DestroyShaders();
         if(m_newShaderPreset)
@@ -910,6 +925,15 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
         }
     }
 
+    if(m_subFramesUpdated)
+    {
+        for(auto& p : m_shaderPasses)
+        {
+            p.UpdateSubFrames(m_subFrames);
+        }
+        m_subFramesUpdated = false;
+    }
+
     if(outputMoved || outputResized || inputResized || (m_lastPos.x != topLeft.x || m_lastPos.y != topLeft.y) || m_lockedAreaUpdated)
     {
         // preprocess captured frame to a texture: crop (via scale & translation), reduce resolution, and whatnot (invert y?)
@@ -1001,7 +1025,7 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
     winrt::com_ptr<ID3D11ShaderResourceView> textureView;
     hr = m_device->CreateShaderResourceView(texture.get(), nullptr, textureView.put());
     assert(SUCCEEDED(hr));
-    m_preprocessPass.Render(textureView.get(), m_passResources, logicalFrameNo, 0, 0);
+    m_preprocessPass.Render(textureView.get(), m_passResources, logicalFrameNo, subFrameNo, 0, 0);
 
     if(m_cursorEmulator.Hidden())
     {
@@ -1010,7 +1034,7 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
         {
             auto mx = ci.ptScreenPos.x;
             auto my = ci.ptScreenPos.y;
-            
+
             if(!m_clone)
             {
                 // glass
@@ -1061,11 +1085,11 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
 
         if(p == 0)
         {
-            shaderPass.Render(m_originalView.get(), m_passResources, logicalFrameNo, passBoxX, passBoxY);
+            shaderPass.Render(m_originalView.get(), m_passResources, logicalFrameNo, subFrameNo, passBoxX, passBoxY);
         }
         else
         {
-            shaderPass.Render(m_passResources, logicalFrameNo, passBoxX, passBoxY);
+            shaderPass.Render(m_passResources, logicalFrameNo, subFrameNo, passBoxX, passBoxY);
         }
         p++;
     }
@@ -1142,7 +1166,7 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
     PresentFrame();
 
     m_renderCounter++;
-    m_prevRenderTicks = GetTickCount64();
+    m_prevRenderTicks = GetTicks();
     if(m_prevRenderTicks - m_prevTicks > 1000)
     {
         auto deltaTicks     = m_prevRenderTicks - m_prevTicks;

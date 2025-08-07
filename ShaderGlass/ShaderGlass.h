@@ -39,6 +39,7 @@ public:
     void  SetCroppedArea(RECT area);
     void  SetFreeScale(bool freeScale);
     void  SetVertical(bool vertical);
+    void  SetSubFrames(unsigned subFrames);
     float FPS()
     {
         return m_fps;
@@ -100,6 +101,7 @@ private:
     ULONGLONG  m_prevFrameTicks {0};
     int        m_prevInputFrameNo {0};
     int        m_prevLogicalFrameNo {0};
+    int        m_prevSubFrameNo {0};
     float      m_fps {0};
     bool       m_requiresFeedback {false};
     int        m_requiresHistory {0};
@@ -135,4 +137,6 @@ private:
     volatile bool  m_croppedAreaUpdated {false};
     volatile bool  m_vertical {false};
     volatile bool  m_verticalUpdated {false};
+    volatile int   m_subFrames {0};
+    volatile bool  m_subFramesUpdated {false};
 };
