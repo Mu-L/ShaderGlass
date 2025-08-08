@@ -10,7 +10,7 @@ GNU General Public License v3.0
 #define MAX_WINDOW_TITLE 200
 #define MAX_DEVICE_NAME 200
 #define TICKS_PER_SEC 10000
-#define REFERENCE_FPS 60.0
+#define REFERENCE_FPS 59.95
 #define REFERENCE_FRAME_TIME (TICKS_PER_SEC / REFERENCE_FPS)
 
 wchar_t*     convertCharArrayToLPCWSTR(const char* charArray);
