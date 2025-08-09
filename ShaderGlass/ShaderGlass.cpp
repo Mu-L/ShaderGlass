@@ -109,7 +109,7 @@ void ShaderGlass::Initialize(HWND                                outputWindow,
         d3d11SwapChainDesc.SampleDesc.Count      = 1;
         d3d11SwapChainDesc.SampleDesc.Quality    = 0;
         d3d11SwapChainDesc.BufferUsage           = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-        d3d11SwapChainDesc.BufferCount           = 1;
+        d3d11SwapChainDesc.BufferCount           = 3;
         // flip mode has a weird bug on Win 10 where the first frame doesn't align with the window client area, until window is moved :(
         if(m_flipMode)
         {
@@ -486,7 +486,7 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
     auto logicalFrameNo      = (int)floor(fractionalFrameNo); // fix shaders at 60 fps
     auto subFrameNo          = m_subFrames > 1 ? ((int)floor((fractionalFrameNo - floor(fractionalFrameNo)) * m_subFrames) % m_subFrames) + 1 : 0;
     // same input
-    if(inputFrameNo == m_prevInputFrameNo)
+    //if(inputFrameNo == m_prevInputFrameNo)
     {
         if(logicalFrameNo == m_prevLogicalFrameNo && subFrameNo == m_prevSubFrameNo)
             return;
@@ -495,14 +495,14 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
         //      if(timeSinceLastInput < 20) // 3.3 ms delay allowance for frame timing
         //        return;
     }
-    else
+    /*else
     {
         // new source frame, there won't be another one until vsync
-        vsync = true;
-    }
+        vsync = true;//true;
+    }*/
 
-    bufi++;
-    //bufi = 0;
+    //bufi++;
+    bufi = 0;
     if(bufi == BUFLEN)
     {
         // save & exit
