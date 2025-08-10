@@ -158,6 +158,7 @@ bool CaptureManager::StartSession()
     UpdateLockedArea();
     UpdateCroppedArea();
     UpdateVertical();
+    UpdateSubFrames();
 
     if(m_options.imageFile.size())
     {
@@ -212,7 +213,8 @@ bool CaptureManager::StartSession()
     }
 
     m_active = true;
-    CreateThread(NULL, 0, ThreadFuncProxy, this, 0, NULL);
+    auto thread = CreateThread(NULL, 0, ThreadFuncProxy, this, 0, NULL);
+    SetThreadPriority(thread, THREAD_PRIORITY_TIME_CRITICAL);
 
     UpdateCursor();
     return true;
@@ -428,6 +430,14 @@ void CaptureManager::UpdateVertical()
     }
 }
 
+void CaptureManager::UpdateSubFrames()
+{
+    if(m_shaderGlass)
+    {
+        m_shaderGlass->SetSubFrames(m_options.subFrames);
+    }
+}
+
 void CaptureManager::GrabOutput()
 {
     if(m_shaderGlass)
@@ -465,7 +475,7 @@ void CaptureManager::ThreadFunc()
 {
     while(m_active)
     {
-        WaitForSingleObject(m_frameEvent, 1);
+        //WaitForSingleObject(m_frameEvent, 1);
         ProcessFrame();
     }
 }

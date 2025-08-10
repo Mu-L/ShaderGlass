@@ -88,6 +88,14 @@ bool ShaderWindow::LoadProfile(const std::wstring& fileName)
                         SendMessage(m_mainWindow, WM_COMMAND, p.first, 0);
                 }
             }
+            else if(key == "SubFrames")
+            {
+                for(const auto& s : subFrames)
+                {
+                    if(value == s.second.mnemonic)
+                        SendMessage(m_mainWindow, WM_COMMAND, s.first, 0);
+                }
+            }
             else if(key == "DPIScaling")
             {
                 if(value == "1")
@@ -446,7 +454,7 @@ void ShaderWindow::LoadInputImage()
         auto prevState   = CheckMenuItem(m_inputMenu, ID_INPUT_FILE, MF_CHECKED | MF_BYCOMMAND);
         auto setDefaults = prevState != MF_CHECKED;
 
-        StartImage(setDefaults, setDefaults ? WM_PIXEL_SIZE(0) : 0);    
+        StartImage(setDefaults, setDefaults ? WM_PIXEL_SIZE(0) : 0);
     }
     EndDialog();
 }
@@ -501,6 +509,7 @@ void ShaderWindow::StartImage(bool autoScale, int pixelSize)
 void ShaderWindow::SaveProfile(const std::wstring& fileName)
 {
     const auto& pixelSize   = pixelSizes.at(WM_PIXEL_SIZE(m_selectedPixelSize));
+    const auto& subFrame    = subFrames.at(WM_SUBFRAMES(m_selectedSubFrames));
     const auto& outputScale = outputScales.at(WM_OUTPUT_SCALE(m_selectedOutputScale));
     const auto& aspectRatio = aspectRatios.at(WM_ASPECT_RATIO(m_selectedAspectRatio));
     const auto& frameSkip   = frameSkips.at(WM_FRAME_SKIP(m_selectedFrameSkip));
@@ -509,6 +518,7 @@ void ShaderWindow::SaveProfile(const std::wstring& fileName)
     std::ofstream outfile(fileName);
     outfile << "ProfileVersion " << std::quoted("1.1") << std::endl;
     outfile << "PixelSize " << std::quoted(pixelSize.mnemonic) << std::endl;
+    outfile << "SubFrames " << std::quoted(subFrame.mnemonic) << std::endl;
     outfile << "DPIScaling " << std::quoted(std::to_string(m_captureOptions.dpiScale != 1.0f)) << std::endl;
     if(aspectRatio.mnemonic == CUSTOM_MNEMONIC)
         outfile << "AspectRatio " << std::quoted(std::to_string(aspectRatio.r)) << std::endl;
@@ -933,7 +943,15 @@ void ShaderWindow::BuildOutputMenu()
 
     m_orientationMenu = GetSubMenu(m_outputMenu, 5);
 
-    InsertMenu(m_outputMenu, 6, MF_BYPOSITION | MF_STRING, ID_PROCESSING_FULLSCREEN, L"Fullscreen\tCtrl+Shift+G");
+    m_subFramesMenu = GetSubMenu(m_outputMenu, 6);
+    RemoveMenu(m_subFramesMenu, 0, MF_BYPOSITION);
+    for(const auto& sf : subFrames)
+    {
+        AppendMenu(m_subFramesMenu, MF_STRING, sf.first, sf.second.text);
+    }
+    CheckMenuItem(m_subFramesMenu, WM_SUBFRAMES(0), MF_CHECKED | MF_BYCOMMAND);
+
+    InsertMenu(m_outputMenu, 7, MF_BYPOSITION | MF_STRING, ID_PROCESSING_FULLSCREEN, L"Fullscreen\tCtrl+Shift+G");
 }
 
 void ShaderWindow::BuildShaderMenu()
@@ -1782,7 +1800,7 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
                 UnregisterHotkeys();
             }
 
-            auto& hk      = m_hotkeys.at(wmId);
+            auto& hk = m_hotkeys.at(wmId);
             StartDialog();
             hk.currentKey = m_hotkeyDialog->GetHotkey(hk.name, hk.currentKey);
             EndDialog();
@@ -1885,6 +1903,15 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
                     m_captureManager.UpdatePixelSize();
                     UpdateWindowState();
                     SendMessage(m_browserWindow, WM_COMMAND, WM_USER + 2, m_selectedPixelSize);
+                    break;
+                }
+                const auto& subFrame = subFrames.find(wmId);
+                if(subFrame != subFrames.end())
+                {
+                    m_selectedSubFrames = wmId - WM_SUBFRAMES(0);
+                    CheckMenuRadioItem(m_subFramesMenu, WM_SUBFRAMES(0), WM_SUBFRAMES(static_cast<UINT>(subFrames.size() - 1)), wmId, MF_BYCOMMAND);
+                    m_captureOptions.subFrames = subFrame->second.s;
+                    m_captureManager.UpdateSubFrames();
                     break;
                 }
                 const auto& outputScale = outputScales.find(wmId);
@@ -2385,7 +2412,29 @@ bool ShaderWindow::Create(_In_ HINSTANCE hInstance, _In_ int nCmdShow)
     if(!LoadDefault())
     {
         // set defaults
-        SendMessage(m_mainWindow, WM_COMMAND, WM_PIXEL_SIZE(3), 0);
+        // TODO: revert
+        SendMessage(m_mainWindow, WM_COMMAND, WM_PIXEL_SIZE(0), 0);
+
+        // TODO: remove
+        {
+            DEVMODE lpDevMode;
+            ZeroMemory(&lpDevMode, sizeof(DEVMODE));
+            lpDevMode.dmSize        = sizeof(DEVMODE);
+            lpDevMode.dmDriverExtra = 0;
+
+            int subframe = WM_SUBFRAMES(0);
+            if(EnumDisplaySettings(NULL, ENUM_CURRENT_SETTINGS, &lpDevMode) != 0)
+            {
+                auto rate = (int)roundf(lpDevMode.dmDisplayFrequency / 60.0f);
+                for(const auto& sf : subFrames)
+                {
+                    if(sf.second.s == rate)
+                        subframe = sf.first;
+                }
+            }
+            SendMessage(m_mainWindow, WM_COMMAND, subframe, 0);
+        }
+
         SendMessage(m_mainWindow, WM_COMMAND, WM_ASPECT_RATIO(0), 0);
         auto defaultNo = m_captureManager.FindByName(defaultPreset);
         if(defaultNo != -1)
@@ -2838,7 +2887,7 @@ void ShaderWindow::LoadHotkeys()
     m_hotkeys.emplace(ID_GLOBALHOTKEYS_SCREENSHOT, HotkeyInfo(ID_GLOBALHOTKEYS_SCREENSHOT, MAKEWORD('S', MOD_CONTROL | MOD_SHIFT), L"Screenshot Key", L"s"));
     m_hotkeys.emplace(ID_GLOBALHOTKEYS_PAUSE, HotkeyInfo(ID_GLOBALHOTKEYS_PAUSE, 0, L"Pause Key", L"t"));
     m_hotkeys.emplace(ID_GLOBALHOTKEYS_CURSOR, HotkeyInfo(ID_GLOBALHOTKEYS_CURSOR, 0, L"Cursor Key", L"c"));
-    m_hotkeys.emplace(ID_GLOBALHOTKEYS_ACTIVE, HotkeyInfo(ID_GLOBALHOTKEYS_ACTIVE, 0, L"Active Key", L"a"));
+    m_hotkeys.emplace(ID_GLOBALHOTKEYS_ACTIVE, HotkeyInfo(ID_GLOBALHOTKEYS_ACTIVE, MAKEWORD('A', MOD_CONTROL | MOD_SHIFT), L"Active Key", L"a"));
     m_hotkeys.emplace(ID_GLOBALHOTKEYS_SHOWMENU, HotkeyInfo(ID_GLOBALHOTKEYS_SHOWMENU, 0, L"Menu Key", L"m"));
 }
 
@@ -2857,7 +2906,7 @@ void ShaderWindow::RegisterHotkeys()
     {
         if(hk.second.currentKey)
             RegisterHotKey(m_mainWindow, hk.first, HIBYTE(hk.second.currentKey), LOBYTE(hk.second.currentKey));
-    }    
+    }
 }
 
 void ShaderWindow::UnregisterHotkeys()
@@ -2900,6 +2949,7 @@ void ShaderWindow::Start(_In_ LPWSTR lpCmdLine, HWND paramsWindow, HWND browserW
     m_inputDialog.reset(new InputDialog(m_instance, m_mainWindow));
     m_cropDialog.reset(new CropDialog(m_instance, m_mainWindow));
     m_hotkeyDialog.reset(new HotkeyDialog(m_instance, m_mainWindow));
+    GetTicks();
 
     if(autoStart && HasCaptureAPI())
     {
