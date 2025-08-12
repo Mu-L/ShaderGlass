@@ -57,6 +57,7 @@ public:
     std::vector<std::tuple<int, ShaderParam*>>     Params();
     const ShaderCache&                             Cache();
     const std::vector<CaptureDevice>&              CaptureDevices();
+    const std::vector<GraphicsAdapter>&            GraphicsAdapters();
     void                                           ShowCursor();
     void                                           HideCursor();
 
@@ -93,11 +94,13 @@ public:
     float OutFPS();
     int   FindByName(const char* presetName);
     bool  FindDeviceFormat(int deviceFormatNo, std::vector<CaptureDevice>::const_iterator& device, std::vector<CaptureFormat>::const_iterator& format);
+    void  SetCaptureAdapters(const std::wstring& captureId, const std::wstring& renderId);
 
 private:
     volatile bool                                     m_active {false};
-    winrt::com_ptr<ID3D11Device>                      m_d3dDevice {nullptr};
-    winrt::com_ptr<ID3D11DeviceContext>               m_context {nullptr};
+    winrt::com_ptr<ID3D11Device>                      m_captureDevice {nullptr};
+    winrt::com_ptr<ID3D11Device>                      m_renderDevice {nullptr};
+    winrt::com_ptr<ID3D11DeviceContext>               m_renderContext {nullptr};
     winrt::com_ptr<ID3D11Debug>                       m_debug {nullptr};
     winrt::com_ptr<ID3D11Texture2D>                   m_outputTexture {nullptr};
     std::unique_ptr<CaptureSession>                   m_session {nullptr};
@@ -106,6 +109,9 @@ private:
     std::vector<std::tuple<int, std::string, double>> m_queuedParams;
     std::vector<std::tuple<int, std::string, double>> m_lastParams;
     std::vector<CaptureDevice>                        m_captureDevices;
+    std::vector<GraphicsAdapter>                      m_graphicsAdapters;
+    IDXGIAdapter*                                     m_captureAdapter {nullptr};
+    IDXGIAdapter*                                     m_renderAdapter {nullptr};
     ShaderCache                                       m_shaderCache;
     DeviceCapture                                     m_deviceCapture;
     CursorEmulator                                    m_cursorEmulator;

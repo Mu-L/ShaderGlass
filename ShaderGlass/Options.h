@@ -115,6 +115,14 @@ struct CaptureDevice
     std::vector<CaptureFormat> formats;
 };
 
+struct GraphicsAdapter
+{
+    unsigned      no;
+    std::wstring  name;
+    std::wstring  id;
+    IDXGIAdapter* adapter;
+};
+
 struct HotkeyInfo
 {
     HotkeyInfo(UINT id, WORD defaultKey, const wchar_t* name, const wchar_t* accelerator) :

@@ -27,7 +27,7 @@ namespace util::uwp
         return vAdapters;
     }
 
-    inline auto CreateD3DDevice(D3D_DRIVER_TYPE const type, winrt::com_ptr<ID3D11Device>& device)
+    inline auto CreateD3DDevice(IDXGIAdapter* adapter, D3D_DRIVER_TYPE const type, winrt::com_ptr<ID3D11Device>& device)
     {
         WINRT_ASSERT(!device);
 
@@ -37,17 +37,17 @@ namespace util::uwp
             	flags |= D3D11_CREATE_DEVICE_DEBUG;
         #endif
 
-        return D3D11CreateDevice(nullptr, type, nullptr, flags, nullptr, 0, D3D11_SDK_VERSION, device.put(),
+        return D3D11CreateDevice(adapter, type, nullptr, flags, nullptr, 0, D3D11_SDK_VERSION, device.put(),
             nullptr, nullptr);
     }
 
-    inline auto CreateD3DDevice()
+    inline auto CreateD3DDevice(IDXGIAdapter* adapter)
     {
         winrt::com_ptr<ID3D11Device> device;
-        HRESULT hr = CreateD3DDevice(D3D_DRIVER_TYPE_HARDWARE, device);
+        HRESULT hr = CreateD3DDevice(adapter, adapter ? D3D_DRIVER_TYPE_UNKNOWN : D3D_DRIVER_TYPE_HARDWARE, device);
         if (DXGI_ERROR_UNSUPPORTED == hr)
         {
-            hr = CreateD3DDevice(D3D_DRIVER_TYPE_WARP, device);
+            hr = CreateD3DDevice(nullptr, D3D_DRIVER_TYPE_WARP, device);
         }
 
         winrt::check_hresult(hr);
