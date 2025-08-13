@@ -12,7 +12,7 @@ GNU General Public License v3.0
 #include "Helpers.h"
 #include "resource.h"
 
-//#define TIMING_DUMP
+#define TIMING_DUMP
 
 static HRESULT     hr;
 static const float background_colour[4] = {0, 0, 0, 1.0f};
@@ -433,6 +433,7 @@ int32_t _prePresentTicks[TIMING_BUFLEN];
 int32_t _postPresentTicks[TIMING_BUFLEN];
 int32_t _frameNo[TIMING_BUFLEN];
 int32_t _subFrameNo[TIMING_BUFLEN];
+int32_t _frameTicks[TIMING_BUFLEN];
 double  _fracFrame[TIMING_BUFLEN];
 
 #endif
@@ -443,7 +444,7 @@ void ShaderGlass::PresentFrame(bool vsync)
     UINT                    presentFlags = 0;
     if(m_flipMode)
     {
-        presentFlags |= DXGI_PRESENT_RESTART;
+        //presentFlags |= DXGI_PRESENT_RESTART;
         if(m_allowTearing)
         {
             presentFlags |= DXGI_PRESENT_ALLOW_TEARING;
@@ -453,15 +454,25 @@ void ShaderGlass::PresentFrame(bool vsync)
     _prePresentTicks[_timingIndex] = GetTicks();
 #endif
     m_swapChain->Present1(vsync ? 1 : 0, presentFlags, &presentParameters);
+    auto afterTicks = GetTicks();
 #ifdef TIMING_DUMP
-    _postPresentTicks[_timingIndex] = GetTicks();
+    _postPresentTicks[_timingIndex] = afterTicks;
 #endif
     PostMessage(m_outputWindow, WM_PAINT, 0, 0); // necessary for click-through
+
+    // sleep
+    /*
+    auto sleepUntil = afterTicks + (3 * m_frameTime / 4);
+    do
+    {
+        Sleep(0);
+    } while(GetTicks() < sleepUntil);*/
 }
 
 void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG frameTicks, int inputFrameNo)
 {
-    auto nowTicks = GetTicks();
+    bool holdTexture = false;
+    auto nowTicks    = GetTicks();
     if(m_startTicks == 0)
     {
 #ifdef TIMING_DUMP
@@ -491,8 +502,28 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
     auto logicalFrameNo      = (int)floor(fractionalFrameNo);
     auto subFrameNo          = m_subFrames > 1 ? ((int)floor((fractionalFrameNo - floor(fractionalFrameNo)) * m_subFrames) % m_subFrames) + 1 : 0;
 
-    if(logicalFrameNo == m_prevLogicalFrameNo && subFrameNo == m_prevSubFrameNo)
-        return;
+    if(m_subFrames > 0)
+    {
+        subFrameNo++;
+        if(subFrameNo > m_subFrames)
+        {
+            subFrameNo = 1;
+            logicalFrameNo++;
+            //          frameTexture = texture; // take new frame
+        }
+        else
+        {
+            holdTexture = true;
+            //            texture = frameTexture; // re-render old frame
+        }
+    }
+    else
+    {
+        logicalFrameNo++;
+    }
+
+    //if(logicalFrameNo == m_prevLogicalFrameNo && subFrameNo == m_prevSubFrameNo)
+    //  return;
 
 #ifdef TIMING_DUMP
     _timingIndex++;
@@ -500,10 +531,10 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
     {
         // save & exit
         std::ofstream o(L"c:\\temp\\sg-timings.csv");
-        o << "NowTicks" << "," << "FrameNo" << "," << "SubFrameNo" << "," << "PrePresentTicks" << "," << "PostPresentTicks" << "," << "FracFrameNo" << std::endl;
+        o << "NowTicks" << "," << "FrameNo" << "," << "SubFrameNo" << "," << "PrePresentTicks" << "," << "PostPresentTicks" << "," << "FracFrameNo" << "," << "FrameTicks" << std::endl;
         for(int i = 0; i < _timingIndex; i++)
         {
-            o << _nowTicks[i] << "," << _frameNo[i] << "," << _subFrameNo[i] << "," << _prePresentTicks[i] << "," << _postPresentTicks[i] << "," << _fracFrame[i] << std::endl;
+            o << _nowTicks[i] << "," << _frameNo[i] << "," << _subFrameNo[i] << "," << _prePresentTicks[i] << "," << _postPresentTicks[i] << "," << _fracFrame[i] << "," << _frameTicks[i] << std::endl;
         }
         o.close();
         abort();
@@ -512,6 +543,7 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
     _fracFrame[_timingIndex]  = fractionalFrameNo;
     _frameNo[_timingIndex]    = logicalFrameNo;
     _subFrameNo[_timingIndex] = subFrameNo;
+    _frameTicks[_timingIndex] = frameTicks;
 #endif
 
     if(m_frameSkip > 0)
@@ -1093,7 +1125,10 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
     winrt::com_ptr<ID3D11ShaderResourceView> textureView;
     hr = m_device->CreateShaderResourceView(texture.get(), nullptr, textureView.put());
     assert(SUCCEEDED(hr));
-    m_preprocessPass.Render(textureView.get(), m_passResources, logicalFrameNo, subFrameNo, 0, 0);
+    if(!holdTexture)
+    {
+        m_preprocessPass.Render(textureView.get(), m_passResources, logicalFrameNo, subFrameNo, 0, 0);
+    }
 
     if(m_cursorEmulator.Hidden())
     {
