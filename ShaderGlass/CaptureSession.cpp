@@ -93,6 +93,9 @@ void CaptureSession::UpdateCursor(bool captureCursor)
 
 void CaptureSession::OnFrameArrived(winrt::Direct3D11CaptureFramePool const& sender, winrt::IInspectable const&)
 {
+    if(!m_session)
+        return;
+
     auto frame      = sender.TryGetNextFrame();
     auto inputFrame = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame.Surface());
 
@@ -162,6 +165,8 @@ TextureBridge::TextureBridge(winrt::com_ptr<ID3D11Device> captureDevice, winrt::
 
 TextureBridge::~TextureBridge()
 {
+    std::unique_lock lock(m_inputMutex);
+
     if(m_inputData)
     {
         free(m_inputData);
@@ -203,7 +208,7 @@ void TextureBridge::PutInputFrame(winrt::com_ptr<ID3D11Texture2D> inputFrame, bo
                 m_inputResized = true;
             }
 
-            if(sourceResource.DepthPitch != m_inputSize)
+            if(sourceResource.DepthPitch != m_inputSize || !m_inputData)
             {
                 if(m_inputData)
                     free(m_inputData);
