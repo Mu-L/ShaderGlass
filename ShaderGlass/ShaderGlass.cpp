@@ -282,6 +282,11 @@ void ShaderGlass::SetSubFrames(unsigned subFrames)
     }
 }
 
+void ShaderGlass::SetSyncSubFrame(bool syncSubFrame)
+{
+    m_syncSubFrame = syncSubFrame;
+}
+
 void ShaderGlass::DestroyTargets()
 {
     if(m_preprocessedRenderTarget != nullptr)
@@ -471,8 +476,8 @@ void ShaderGlass::PresentFrame(bool vsync)
 
 void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG frameTicks, int inputFrameNo)
 {
-    bool holdTexture = false;
-    auto nowTicks    = GetTicks();
+    bool holdInput = false;
+    auto nowTicks  = GetTicks();
     if(m_startTicks == 0)
     {
 #ifdef TIMING_DUMP
@@ -509,12 +514,10 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
         {
             subFrameNo = 1;
             logicalFrameNo++;
-            //          frameTexture = texture; // take new frame
         }
-        else
+        else if(m_syncSubFrame)
         {
-            holdTexture = true;
-            //            texture = frameTexture; // re-render old frame
+            holdInput = true;
         }
     }
     else
@@ -531,10 +534,12 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
     {
         // save & exit
         std::ofstream o(L"c:\\temp\\sg-timings.csv");
-        o << "NowTicks" << "," << "FrameNo" << "," << "SubFrameNo" << "," << "PrePresentTicks" << "," << "PostPresentTicks" << "," << "FracFrameNo" << "," << "FrameTicks" << std::endl;
+        o << "NowTicks" << "," << "FrameNo" << "," << "SubFrameNo" << "," << "PrePresentTicks" << "," << "PostPresentTicks" << "," << "FracFrameNo" << "," << "FrameTicks"
+          << std::endl;
         for(int i = 0; i < _timingIndex; i++)
         {
-            o << _nowTicks[i] << "," << _frameNo[i] << "," << _subFrameNo[i] << "," << _prePresentTicks[i] << "," << _postPresentTicks[i] << "," << _fracFrame[i] << "," << _frameTicks[i] << std::endl;
+            o << _nowTicks[i] << "," << _frameNo[i] << "," << _subFrameNo[i] << "," << _prePresentTicks[i] << "," << _postPresentTicks[i] << "," << _fracFrame[i] << ","
+              << _frameTicks[i] << std::endl;
         }
         o.close();
         abort();
@@ -1125,7 +1130,7 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
     winrt::com_ptr<ID3D11ShaderResourceView> textureView;
     hr = m_device->CreateShaderResourceView(texture.get(), nullptr, textureView.put());
     assert(SUCCEEDED(hr));
-    if(!holdTexture)
+    if(!holdInput)
     {
         m_preprocessPass.Render(textureView.get(), m_passResources, logicalFrameNo, subFrameNo, 0, 0);
     }

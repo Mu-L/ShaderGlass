@@ -190,6 +190,7 @@ bool CaptureManager::StartSession()
     UpdatePixelSize();
     UpdateOutputSize();
     UpdateOutputFlip();
+    UpdateSyncSubFrame();
     UpdateShaderPreset();
     UpdateFrameSkip();
     UpdateLockedArea();
@@ -417,6 +418,14 @@ void CaptureManager::UpdateOutputFlip()
     if(m_shaderGlass)
     {
         m_shaderGlass->SetOutputFlip(m_options.flipHorizontal, m_options.flipVertical);
+    }
+}
+
+void CaptureManager::UpdateSyncSubFrame()
+{
+    if(m_shaderGlass)
+    {
+        m_shaderGlass->SetSyncSubFrame(m_options.syncSubFrame);
     }
 }
 

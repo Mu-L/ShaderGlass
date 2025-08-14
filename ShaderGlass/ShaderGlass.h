@@ -40,6 +40,7 @@ public:
     void  SetFreeScale(bool freeScale);
     void  SetVertical(bool vertical);
     void  SetSubFrames(unsigned subFrames);
+    void  SetSyncSubFrame(bool syncSubFrame);
     float FPS()
     {
         return m_fps;
@@ -139,5 +140,6 @@ private:
     volatile bool   m_verticalUpdated {false};
     volatile int    m_subFrames {0};
     volatile bool   m_subFramesUpdated {false};
+    volatile bool   m_syncSubFrame {true};
     volatile double m_frameTime {0};
 };

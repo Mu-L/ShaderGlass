@@ -974,7 +974,6 @@ void ShaderWindow::BuildOutputMenu()
     m_orientationMenu = GetSubMenu(m_outputMenu, 5);
 
     m_subFramesMenu = GetSubMenu(m_outputMenu, 6);
-    RemoveMenu(m_subFramesMenu, 0, MF_BYPOSITION);
     for(const auto& sf : subFrames)
     {
         AppendMenu(m_subFramesMenu, MF_STRING, sf.first, sf.second.text);
@@ -1642,6 +1641,14 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
             else
                 CheckMenuItem(m_flipMenu, IDM_FLIP_VERTICAL, MF_UNCHECKED | MF_BYCOMMAND);
             m_captureManager.UpdateOutputFlip();
+            break;
+        case ID_SUBFRAME_SYNC:
+            m_captureOptions.syncSubFrame = !m_captureOptions.syncSubFrame;
+            if(m_captureOptions.syncSubFrame)
+                CheckMenuItem(m_subFramesMenu, ID_SUBFRAME_SYNC, MF_CHECKED | MF_BYCOMMAND);
+            else
+                CheckMenuItem(m_subFramesMenu, ID_SUBFRAME_SYNC, MF_UNCHECKED | MF_BYCOMMAND);
+            m_captureManager.UpdateSubFrames();
             break;
         case ID_ORIENTATION_HORIZONTAL:
         case ID_ORIENTATION_VERTICAL: {

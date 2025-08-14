@@ -43,6 +43,7 @@ struct CaptureOptions
     RECT         croppedArea {0, 0, 0, 0};
     bool         vertical {false};
     unsigned     subFrames {0};
+    bool         syncSubFrame {true};
 };
 
 class CaptureManager
@@ -70,6 +71,7 @@ public:
     void  UpdatePixelSize();
     void  UpdateOutputSize();
     void  UpdateOutputFlip();
+    void  UpdateSyncSubFrame();
     void  UpdateShaderPreset();
     void  UpdateFrameSkip();
     bool  UpdateInput();
