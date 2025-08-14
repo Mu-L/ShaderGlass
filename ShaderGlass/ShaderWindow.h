@@ -124,7 +124,7 @@ private:
     void         UpdateHotkey(const HotkeyInfo& hk, bool globalState);
     void         LoadHotkeys();
     void         LoadGPUs();
-    void         SaveGPUs();
+    void         SaveGPUs(const LUID& captureId, const LUID& renderId);
     void         UpdateHotkeys(bool globalState);
     void         SaveFlipModeState(bool state);
     bool         GetFlipModeState();

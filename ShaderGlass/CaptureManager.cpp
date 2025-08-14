@@ -375,8 +375,6 @@ void CaptureManager::Exit()
         m_active = false;
         SetEvent(m_frameEvent);
 
-        WaitForSingleObject(m_thread, 5000);
-
         if(m_deviceCapture.m_active)
             m_deviceCapture.Stop();
 
@@ -589,16 +587,27 @@ void CaptureManager::SetGraphicsAdapters(LUID captureId, LUID renderId)
     }
 }
 
-void CaptureManager::SetGraphicsAdapters(int captureNo, int renderNo)
+void CaptureManager::SetGraphicsAdapters(int captureNo, int renderNo, LUID& captureId, LUID& renderId)
 {
     bool active = m_active;
     if(active)
         StopSession();
+    captureId.LowPart  = 0;
+    captureId.HighPart = 0;
+    renderId.LowPart   = 0;
+    renderId.HighPart  = 0;
     for(auto& ga : m_graphicsAdapters)
     {
-        ga.capture = (captureNo == ga.no);
-        ga.render  = (renderNo == ga.no);
+        if(captureNo == ga.no)
+        {
+            captureId = ga.luid;
+        }
+        if(renderNo == ga.no)
+        {
+            renderId = ga.luid;
+        }
     }
+    SetGraphicsAdapters(captureId, renderId);
     m_defaultAdapter = (captureNo == 0 && renderNo == 0);
     m_captureDevice  = nullptr;
     m_renderDevice   = nullptr;

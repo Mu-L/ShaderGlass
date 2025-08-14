@@ -94,7 +94,7 @@ public:
     float OutFPS();
     int   FindByName(const char* presetName);
     bool  FindDeviceFormat(int deviceFormatNo, std::vector<CaptureDevice>::const_iterator& device, std::vector<CaptureFormat>::const_iterator& format);
-    void  SetGraphicsAdapters(int captureNo, int renderNo);
+    void  SetGraphicsAdapters(int captureNo, int renderNo, LUID& captureId, LUID& renderId);
     void  SetGraphicsAdapters(LUID captureId, LUID renderId);
     LUID  GetAdapterLuid(winrt::com_ptr<ID3D11Device> device);
 

@@ -882,8 +882,6 @@ void ShaderWindow::BuildProgramMenu()
     m_hotkeysMenu = GetSubMenu(m_programMenu, 3);
     m_gpuMenu     = GetSubMenu(m_programMenu, 7);
 
-    //    ModifyMenu(m_gpuMenu, ID_GPU_DEFAULT, MF_BYCOMMAND | MF_STRING | MF_CHECKED | MF_DISABLED, ID_GPU_DEFAULT, m_captureManager.m_deviceName.c_str());
-
     const auto& gpus = m_captureManager.GraphicsAdapters();
     if(gpus.size() > 1)
     {
@@ -895,6 +893,8 @@ void ShaderWindow::BuildProgramMenu()
             InsertMenu(m_gpuMenu, gp++, MF_STRING, WM_GPU(gpu.no, gpu.no), name);
         }
 
+#ifdef CROSS_GPU
+        // technically works but doesn't cleanly switch due to cleanup race conditions so disabling for now
         m_crossMenu = CreatePopupMenu();
         InsertMenu(m_gpuMenu, gp, MF_BYPOSITION | MF_STRING | MF_POPUP, (UINT_PTR)m_crossMenu, L"Cross GPU");
 
@@ -908,6 +908,7 @@ void ShaderWindow::BuildProgramMenu()
                     _snwprintf_s(name, 100, L"Capture #%d -> Render #%d", cg.no, rg.no);
                     InsertMenu(m_crossMenu, cp++, MF_STRING, WM_GPU(cg.no, rg.no), name);
                 }
+#endif
     }
 
     m_advancedMenu = GetSubMenu(m_programMenu, 10);
@@ -1603,8 +1604,7 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
             SendMessage(hWnd, WM_COMMAND, WM_SHADER(rand() % m_numPresets), 0);
             break;
         case ID_GPU_DEFAULT:
-            m_captureManager.SetGraphicsAdapters(0, 0);
-            UpdateGPUName();
+            SendMessage(hWnd, WM_COMMAND, WM_GPU(0, 0), 0);
             break;
         case IDM_FULLSCREEN:
             ToggleBorderless(hWnd);
@@ -2041,8 +2041,10 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
                 if(wmId >= WM_GPU(0, 0) && wmId <= WM_GPU(MAX_GPU, MAX_GPU))
                 {
                     auto captureNo = (wmId - WM_GPU(0, 0)) / MAX_GPU;
-                    auto renderNo = (wmId - WM_GPU(0, 0)) % MAX_GPU;
-                    m_captureManager.SetGraphicsAdapters(captureNo, renderNo);
+                    auto renderNo  = (wmId - WM_GPU(0, 0)) % MAX_GPU;
+                    LUID captureId, renderId;
+                    m_captureManager.SetGraphicsAdapters(captureNo, renderNo, captureId, renderId);
+                    SaveGPUs(captureId, renderId);
                     UpdateGPUName();
                 }
             }
@@ -2433,6 +2435,7 @@ bool ShaderWindow::Create(_In_ HINSTANCE hInstance, _In_ int nCmdShow)
     {
         CheckMenuItem(m_frameSkipMenu, ID_FPS_REMEMBERFPS, MF_BYCOMMAND | MF_CHECKED);
     }
+    LoadGPUs();
     if(CanSetCaptureRate())
     {
         if(GetMaxCaptureRateState())
@@ -2960,13 +2963,20 @@ void ShaderWindow::LoadGPUs()
 {
     LUID captureId {.LowPart = (DWORD)GetRegistryInt(L"CaptureGPU.LowPart", 0), .HighPart = GetRegistryInt(L"CaptureGPU.HighPart", 0)};
     LUID renderId {.LowPart = (DWORD)GetRegistryInt(L"RenderGPU.LowPart", 0), .HighPart = GetRegistryInt(L"RenderGPU.HighPart", 0)};
-    m_captureManager.SetGraphicsAdapters(captureId, renderId);
+    if(captureId.LowPart || captureId.HighPart || renderId.LowPart || renderId.HighPart)
+    {
+        m_captureManager.SetGraphicsAdapters(captureId, renderId);
+        m_captureManager.m_defaultAdapter = false;
+    }
+    UpdateGPUName();
 }
 
-void ShaderWindow::SaveGPUs()
+void ShaderWindow::SaveGPUs(const LUID& captureId, const LUID& renderId)
 {
-    LUID captureId {.LowPart = 0, .HighPart = 0};
-    LUID renderId {.LowPart = 0, .HighPart = 0};
+    SaveRegistryInt(L"CaptureGPU.LowPart", captureId.LowPart);
+    SaveRegistryInt(L"CaptureGPU.HighPart", captureId.HighPart);
+    SaveRegistryInt(L"RenderGPU.LowPart", renderId.LowPart);
+    SaveRegistryInt(L"RenderGPU.HighPart", renderId.HighPart);
 }
 
 void ShaderWindow::LoadHotkeys()
