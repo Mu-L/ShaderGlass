@@ -1650,6 +1650,14 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
                 CheckMenuItem(m_subFramesMenu, ID_SUBFRAME_SYNC, MF_UNCHECKED | MF_BYCOMMAND);
             m_captureManager.UpdateSubFrames();
             break;
+        case ID_SUB_INTERNALVSYNC:
+            m_captureOptions.internalVSync = !m_captureOptions.internalVSync;
+            if(m_captureOptions.internalVSync)
+                CheckMenuItem(m_subFramesMenu, ID_SUB_INTERNALVSYNC, MF_CHECKED | MF_BYCOMMAND);
+            else
+                CheckMenuItem(m_subFramesMenu, ID_SUB_INTERNALVSYNC, MF_UNCHECKED | MF_BYCOMMAND);
+            m_captureManager.UpdateInternalVSync();
+            break;
         case ID_ORIENTATION_HORIZONTAL:
         case ID_ORIENTATION_VERTICAL: {
             m_captureOptions.vertical = (wmId == ID_ORIENTATION_VERTICAL);

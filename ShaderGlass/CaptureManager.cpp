@@ -191,6 +191,7 @@ bool CaptureManager::StartSession()
     UpdateOutputSize();
     UpdateOutputFlip();
     UpdateSyncSubFrame();
+    UpdateInternalVSync();
     UpdateShaderPreset();
     UpdateFrameSkip();
     UpdateLockedArea();
@@ -426,6 +427,14 @@ void CaptureManager::UpdateSyncSubFrame()
     if(m_shaderGlass)
     {
         m_shaderGlass->SetSyncSubFrame(m_options.syncSubFrame);
+    }
+}
+
+void CaptureManager::UpdateInternalVSync()
+{
+    if(m_shaderGlass)
+    {
+        m_shaderGlass->SetInternalVSync(m_options.internalVSync);
     }
 }
 

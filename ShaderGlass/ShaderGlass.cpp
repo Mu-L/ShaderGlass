@@ -287,6 +287,11 @@ void ShaderGlass::SetSyncSubFrame(bool syncSubFrame)
     m_syncSubFrame = syncSubFrame;
 }
 
+void ShaderGlass::SetInternalVSync(bool internalVSync)
+{
+    m_internalVSync = internalVSync;
+}
+
 void ShaderGlass::DestroyTargets()
 {
     if(m_preprocessedRenderTarget != nullptr)
@@ -449,7 +454,10 @@ void ShaderGlass::PresentFrame(bool vsync)
     UINT                    presentFlags = 0;
     if(m_flipMode)
     {
-        //presentFlags |= DXGI_PRESENT_RESTART;
+        if(!vsync)
+        {
+            presentFlags |= DXGI_PRESENT_RESTART;
+        }
         if(m_allowTearing)
         {
             presentFlags |= DXGI_PRESENT_ALLOW_TEARING;
@@ -464,14 +472,6 @@ void ShaderGlass::PresentFrame(bool vsync)
     _postPresentTicks[_timingIndex] = afterTicks;
 #endif
     PostMessage(m_outputWindow, WM_PAINT, 0, 0); // necessary for click-through
-
-    // sleep
-    /*
-    auto sleepUntil = afterTicks + (3 * m_frameTime / 4);
-    do
-    {
-        Sleep(0);
-    } while(GetTicks() < sleepUntil);*/
 }
 
 void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG frameTicks, int inputFrameNo)
@@ -502,31 +502,38 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
 #endif
         return;
     }
-    auto timeSinceLastRender = nowTicks - m_prevRenderTicks;
-    auto fractionalFrameNo   = (nowTicks - m_startTicks) / (m_frameTime * max(m_subFrames, 1));
-    auto logicalFrameNo      = (int)floor(fractionalFrameNo);
-    auto subFrameNo          = m_subFrames > 1 ? ((int)floor((fractionalFrameNo - floor(fractionalFrameNo)) * m_subFrames) % m_subFrames) + 1 : 0;
+    double fractionalFrameNo = m_prevLogicalFrameNo;
+    int    logicalFrameNo    = m_prevLogicalFrameNo;
+    int    subFrameNo        = m_prevSubFrameNo;
 
-    if(m_subFrames > 0)
+    if(m_internalVSync)
     {
-        subFrameNo++;
-        if(subFrameNo > m_subFrames)
-        {
-            subFrameNo = 1;
-            logicalFrameNo++;
-        }
-        else if(m_syncSubFrame)
-        {
-            holdInput = true;
-        }
+        fractionalFrameNo = (nowTicks - m_startTicks) / (m_frameTime * max(m_subFrames, 1));
+        logicalFrameNo    = (int)floor(fractionalFrameNo);
+        subFrameNo        = m_subFrames > 1 ? ((int)floor((fractionalFrameNo - floor(fractionalFrameNo)) * m_subFrames) % m_subFrames) + 1 : 0;
+        if(logicalFrameNo == m_prevLogicalFrameNo && subFrameNo == m_prevSubFrameNo)
+            return;
     }
     else
     {
-        logicalFrameNo++;
+        if(m_subFrames > 0)
+        {
+            subFrameNo = m_prevSubFrameNo + 1;
+            if(subFrameNo > m_subFrames)
+            {
+                subFrameNo = 1;
+                logicalFrameNo++;
+            }
+            else if(m_syncSubFrame)
+            {
+                holdInput = true;
+            }
+        }
+        else
+        {
+            logicalFrameNo++;
+        }
     }
-
-    //if(logicalFrameNo == m_prevLogicalFrameNo && subFrameNo == m_prevSubFrameNo)
-    //  return;
 
 #ifdef TIMING_DUMP
     _timingIndex++;

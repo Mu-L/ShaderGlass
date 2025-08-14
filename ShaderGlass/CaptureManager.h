@@ -44,6 +44,7 @@ struct CaptureOptions
     bool         vertical {false};
     unsigned     subFrames {0};
     bool         syncSubFrame {true};
+    bool         internalVSync {false};
 };
 
 class CaptureManager
@@ -72,6 +73,7 @@ public:
     void  UpdateOutputSize();
     void  UpdateOutputFlip();
     void  UpdateSyncSubFrame();
+    void  UpdateInternalVSync();
     void  UpdateShaderPreset();
     void  UpdateFrameSkip();
     bool  UpdateInput();

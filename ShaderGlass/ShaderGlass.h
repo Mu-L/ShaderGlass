@@ -41,6 +41,7 @@ public:
     void  SetVertical(bool vertical);
     void  SetSubFrames(unsigned subFrames);
     void  SetSyncSubFrame(bool syncSubFrame);
+    void  SetInternalVSync(bool internalVSync);
     float FPS()
     {
         return m_fps;
@@ -141,5 +142,6 @@ private:
     volatile int    m_subFrames {0};
     volatile bool   m_subFramesUpdated {false};
     volatile bool   m_syncSubFrame {true};
+    volatile bool   m_internalVSync {false};
     volatile double m_frameTime {0};
 };
