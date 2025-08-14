@@ -1464,6 +1464,7 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
             }
             break;
         case ID_PRESENTATION_USEFLIPMODE:
+#ifndef FORCE_FLIPMODE
             if(GetMenuState(m_advancedMenu, ID_PRESENTATION_USEFLIPMODE, MF_BYCOMMAND) & MF_CHECKED)
             {
                 CheckMenuItem(m_advancedMenu, ID_PRESENTATION_USEFLIPMODE, MF_UNCHECKED);
@@ -1474,6 +1475,7 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
                 CheckMenuItem(m_advancedMenu, ID_PRESENTATION_USEFLIPMODE, MF_CHECKED);
                 SaveFlipModeState(true);
             }
+#endif
             break;
         case ID_ADVANCED_ALLOWTEARING:
             if(GetMenuState(m_advancedMenu, ID_ADVANCED_ALLOWTEARING, MF_BYCOMMAND) & MF_CHECKED)
@@ -1505,6 +1507,7 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
                 CheckMenuItem(m_advancedMenu, ID_ADVANCED_USEHDR, MF_UNCHECKED);
                 SaveUseHDRState(false);
 
+#ifndef FORCE_FLIPMODE
                 EnableMenuItem(m_advancedMenu, ID_PRESENTATION_USEFLIPMODE, MF_BYCOMMAND | MF_ENABLED);
 
                 if(GetFlipModeState())
@@ -1515,14 +1518,16 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
                 {
                     CheckMenuItem(m_advancedMenu, ID_PRESENTATION_USEFLIPMODE, MF_UNCHECKED);
                 }
+#endif
             }
             else
             {
                 CheckMenuItem(m_advancedMenu, ID_ADVANCED_USEHDR, MF_CHECKED);
                 SaveUseHDRState(true);
-
+#ifndef FORCE_FLIPMODE
                 CheckMenuItem(m_advancedMenu, ID_PRESENTATION_USEFLIPMODE, MF_BYCOMMAND | MF_CHECKED);
                 EnableMenuItem(m_advancedMenu, ID_PRESENTATION_USEFLIPMODE, MF_BYCOMMAND | MF_GRAYED);
+#endif
             }
             break;
         case ID_DESKTOP_LOCKINPUTAREA:
@@ -2427,13 +2432,17 @@ bool ShaderWindow::Create(_In_ HINSTANCE hInstance, _In_ int nCmdShow)
         CheckMenuItem(m_advancedMenu, ID_ADVANCED_USEHDR, MF_BYCOMMAND | MF_CHECKED);
         m_captureOptions.useHDR = true;
 
+#ifndef FORCE_FLIPMODE
         CheckMenuItem(m_advancedMenu, ID_PRESENTATION_USEFLIPMODE, MF_BYCOMMAND | MF_CHECKED);
         EnableMenuItem(m_advancedMenu, ID_PRESENTATION_USEFLIPMODE, MF_BYCOMMAND | MF_GRAYED);
+#endif
         m_captureOptions.flipMode = true;
     }
     else if(GetFlipModeState())
     {
+#ifndef FORCE_FLIPMODE
         EnableMenuItem(m_advancedMenu, ID_PRESENTATION_USEFLIPMODE, MF_BYCOMMAND | MF_ENABLED);
+#endif
         CheckMenuItem(m_advancedMenu, ID_PRESENTATION_USEFLIPMODE, MF_BYCOMMAND | MF_CHECKED);
         m_captureOptions.flipMode = true;
     }
@@ -2594,12 +2603,18 @@ bool ShaderWindow::GetHotkeyState()
 
 void ShaderWindow::SaveFlipModeState(bool state)
 {
+#ifndef FORCE_FLIPMODE
     SaveRegistryOption(TEXT("Use Flip Mode"), state);
+#endif
 }
 
 bool ShaderWindow::GetFlipModeState()
 {
+#ifdef FORCE_FLIPMODE
+    return true;
+#else
     return GetRegistryOption(TEXT("Use Flip Mode"), false);
+#endif
 }
 
 void ShaderWindow::SaveTearingState(bool state)
