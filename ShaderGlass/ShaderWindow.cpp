@@ -2624,7 +2624,11 @@ void ShaderWindow::SaveTearingState(bool state)
 
 bool ShaderWindow::GetTearingState()
 {
+#ifdef FORCE_FLIPMODE
+    return false;
+#else
     return GetRegistryOption(TEXT("Allow Tearing"), false);
+#endif
 }
 
 void ShaderWindow::SaveMaxCaptureRateState(bool state)
