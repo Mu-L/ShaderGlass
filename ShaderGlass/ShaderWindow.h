@@ -40,6 +40,7 @@ private:
     HMENU                         m_programMenu {nullptr};
     HMENU                         m_hotkeysMenu {nullptr};
     HMENU                         m_gpuMenu {nullptr};
+    HMENU                         m_crossMenu {nullptr};
     HMENU                         m_shaderMenu {nullptr};
     HMENU                         m_pixelSizeMenu {nullptr};
     HMENU                         m_subFramesMenu {nullptr};
@@ -122,6 +123,8 @@ private:
     void         SaveHotkey(const HotkeyInfo& hk);
     void         UpdateHotkey(const HotkeyInfo& hk, bool globalState);
     void         LoadHotkeys();
+    void         LoadGPUs();
+    void         SaveGPUs(const LUID& captureId, const LUID& renderId);
     void         UpdateHotkeys(bool globalState);
     void         SaveFlipModeState(bool state);
     bool         GetFlipModeState();

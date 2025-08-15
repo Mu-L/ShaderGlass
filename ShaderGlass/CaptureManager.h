@@ -43,6 +43,8 @@ struct CaptureOptions
     RECT         croppedArea {0, 0, 0, 0};
     bool         vertical {false};
     unsigned     subFrames {0};
+    bool         syncSubFrame {true};
+    bool         internalVSync {false};
 };
 
 class CaptureManager
@@ -51,7 +53,7 @@ public:
     CaptureManager(HINSTANCE instance);
 
     CaptureOptions m_options;
-    std::wstring   m_deviceName;
+    bool           m_defaultAdapter {true};
 
     const std::vector<std::unique_ptr<PresetDef>>& Presets();
     std::vector<std::tuple<int, ShaderParam*>>     Params();
@@ -70,6 +72,8 @@ public:
     void  UpdatePixelSize();
     void  UpdateOutputSize();
     void  UpdateOutputFlip();
+    void  UpdateSyncSubFrame();
+    void  UpdateInternalVSync();
     void  UpdateShaderPreset();
     void  UpdateFrameSkip();
     bool  UpdateInput();
@@ -94,7 +98,9 @@ public:
     float OutFPS();
     int   FindByName(const char* presetName);
     bool  FindDeviceFormat(int deviceFormatNo, std::vector<CaptureDevice>::const_iterator& device, std::vector<CaptureFormat>::const_iterator& format);
-    void  SetCaptureAdapters(const std::wstring& captureId, const std::wstring& renderId);
+    void  SetGraphicsAdapters(int captureNo, int renderNo, LUID& captureId, LUID& renderId);
+    void  SetGraphicsAdapters(LUID captureId, LUID renderId);
+    LUID  GetAdapterLuid(winrt::com_ptr<ID3D11Device> device);
 
 private:
     volatile bool                                     m_active {false};
@@ -110,12 +116,11 @@ private:
     std::vector<std::tuple<int, std::string, double>> m_lastParams;
     std::vector<CaptureDevice>                        m_captureDevices;
     std::vector<GraphicsAdapter>                      m_graphicsAdapters;
-    IDXGIAdapter*                                     m_captureAdapter {nullptr};
-    IDXGIAdapter*                                     m_renderAdapter {nullptr};
     ShaderCache                                       m_shaderCache;
     DeviceCapture                                     m_deviceCapture;
     CursorEmulator                                    m_cursorEmulator;
     HANDLE                                            m_frameEvent {nullptr};
+    HANDLE                                            m_thread {0};
     HINSTANCE                                         m_instance {0};
     unsigned int                                      m_lastPreset;
 };

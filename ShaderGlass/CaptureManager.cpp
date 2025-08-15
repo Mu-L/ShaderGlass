@@ -22,7 +22,7 @@ using namespace std;
 using namespace util;
 using namespace util::uwp;
 
-CaptureManager::CaptureManager(HINSTANCE instance) : m_options(), m_deviceName(L"Default"), m_lastPreset(-1), m_instance {instance} { }
+CaptureManager::CaptureManager(HINSTANCE instance) : m_options(), m_lastPreset(-1), m_instance {instance} { }
 
 bool CaptureManager::Initialize()
 {
@@ -93,10 +93,12 @@ const std::vector<GraphicsAdapter>& CaptureManager::GraphicsAdapters()
                 if((desc.VendorId == 0x1414) && (desc.DeviceId == 0x8c))
                     continue; // Microsoft Basic Render Driver
 
-                wchar_t id[24];
-                _snwprintf_s(id, 24, L"%lx:%lx", desc.AdapterLuid.HighPart, desc.AdapterLuid.LowPart);
-                m_graphicsAdapters.emplace_back(no++, std::wstring(desc.Description), std::wstring(id), adapter);
+                m_graphicsAdapters.emplace_back(no++, std::wstring(desc.Description), adapter, desc.AdapterLuid, false, false);
             }
+
+            // max GPUs
+            if(m_graphicsAdapters.size() == 3)
+                break;
         }
     }
     return m_graphicsAdapters;
@@ -120,15 +122,27 @@ DWORD WINAPI ThreadFuncProxy(LPVOID lpParam)
 
 bool CaptureManager::StartSession()
 {
-    bool hybrid = false;
+    bool cross = false;
 
     if(!m_captureDevice)
     {
-        m_captureDevice = CreateD3DDevice(m_captureAdapter);
-        if(m_captureAdapter != m_renderAdapter)
+        IDXGIAdapter *captureAdapter = nullptr, *renderAdapter = nullptr;
+        if(m_graphicsAdapters.size() > 1)
         {
-            m_renderDevice = CreateD3DDevice(m_renderAdapter);
-            hybrid         = true;
+            for(const auto& ga : m_graphicsAdapters)
+            {
+                if(ga.capture)
+                    captureAdapter = ga.adapter.get();
+                if(ga.render)
+                    renderAdapter = ga.adapter.get();
+            }
+        }
+
+        m_captureDevice = CreateD3DDevice(captureAdapter);
+        if(captureAdapter != nullptr && renderAdapter != nullptr && captureAdapter != renderAdapter)
+        {
+            m_renderDevice = CreateD3DDevice(renderAdapter);
+            cross          = true;
         }
         else
         {
@@ -136,19 +150,10 @@ bool CaptureManager::StartSession()
         }
         m_renderDevice->GetImmediateContext(m_renderContext.put());
 
-        // get actual GPU name
-        {
-            auto                         dxgiDevice = m_renderDevice.as<IDXGIDevice>();
-            winrt::com_ptr<IDXGIAdapter> adapter;
-            if(SUCCEEDED(dxgiDevice->GetAdapter(adapter.put())))
-            {
-                DXGI_ADAPTER_DESC desc;
-                if(SUCCEEDED(adapter->GetDesc(&desc)))
-                {
-                    m_deviceName = std::wstring(desc.Description);
-                }
-            }
-        }
+        // mark GPUs
+        LUID captureId = GetAdapterLuid(m_captureDevice);
+        LUID renderId  = GetAdapterLuid(m_renderDevice);
+        SetGraphicsAdapters(captureId, renderId);
     }
 
 #ifdef _DEBUG
@@ -185,6 +190,8 @@ bool CaptureManager::StartSession()
     UpdatePixelSize();
     UpdateOutputSize();
     UpdateOutputFlip();
+    UpdateSyncSubFrame();
+    UpdateInternalVSync();
     UpdateShaderPreset();
     UpdateFrameSkip();
     UpdateLockedArea();
@@ -242,12 +249,12 @@ bool CaptureManager::StartSession()
                                                                                              : winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized;
 
         m_session =
-            make_unique<CaptureSession>(m_captureDevice, hybrid ? m_renderDevice : nullptr, captureItem, pixelFormat, *m_shaderGlass, m_options.maxCaptureRate, m_frameEvent);
+            make_unique<CaptureSession>(m_captureDevice, cross ? m_renderDevice : nullptr, captureItem, pixelFormat, *m_shaderGlass, m_options.maxCaptureRate, m_frameEvent);
     }
 
-    m_active    = true;
-    auto thread = CreateThread(NULL, 0, ThreadFuncProxy, this, 0, NULL);
-    SetThreadPriority(thread, THREAD_PRIORITY_TIME_CRITICAL);
+    m_active = true;
+    m_thread = CreateThread(NULL, 0, ThreadFuncProxy, this, 0, NULL);
+    SetThreadPriority(m_thread, THREAD_PRIORITY_TIME_CRITICAL);
 
     UpdateCursor();
     return true;
@@ -379,6 +386,9 @@ void CaptureManager::Exit()
         m_shaderGlass->Stop();
         delete m_shaderGlass.release();
 
+        m_renderContext->ClearState();
+        m_renderContext->Flush();
+
         if(m_debug)
         {
             m_debug->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL | D3D11_RLDO_IGNORE_INTERNAL);
@@ -412,6 +422,22 @@ void CaptureManager::UpdateOutputFlip()
     if(m_shaderGlass)
     {
         m_shaderGlass->SetOutputFlip(m_options.flipHorizontal, m_options.flipVertical);
+    }
+}
+
+void CaptureManager::UpdateSyncSubFrame()
+{
+    if(m_shaderGlass)
+    {
+        m_shaderGlass->SetSyncSubFrame(m_options.syncSubFrame);
+    }
+}
+
+void CaptureManager::UpdateInternalVSync()
+{
+    if(m_shaderGlass)
+    {
+        m_shaderGlass->SetInternalVSync(m_options.internalVSync);
     }
 }
 
@@ -573,19 +599,56 @@ bool CaptureManager::FindDeviceFormat(int deviceFormatNo, std::vector<CaptureDev
     return false;
 }
 
-void CaptureManager::SetCaptureAdapters(const std::wstring& captureId, const std::wstring& renderId)
+void CaptureManager::SetGraphicsAdapters(LUID captureId, LUID renderId)
 {
-    m_captureAdapter = nullptr;
-    m_renderAdapter  = nullptr;
-    if(captureId.size() || renderId.size())
+    for(auto& ga : m_graphicsAdapters)
     {
-        const auto& graphicsAdapters = GraphicsAdapters();
-        for(const auto& ga : graphicsAdapters)
+        ga.capture = (ga.luid.HighPart == captureId.HighPart && ga.luid.LowPart == captureId.LowPart);
+        ga.render  = (ga.luid.HighPart == renderId.HighPart && ga.luid.LowPart == renderId.LowPart);
+    }
+}
+
+void CaptureManager::SetGraphicsAdapters(int captureNo, int renderNo, LUID& captureId, LUID& renderId)
+{
+    bool active = m_active;
+    if(active)
+        StopSession();
+    captureId.LowPart  = 0;
+    captureId.HighPart = 0;
+    renderId.LowPart   = 0;
+    renderId.HighPart  = 0;
+    for(auto& ga : m_graphicsAdapters)
+    {
+        if(captureNo == ga.no)
         {
-            if(ga.id == captureId)
-                m_captureAdapter = ga.adapter;
-            if(ga.id == renderId)
-                m_renderAdapter = ga.adapter;
+            captureId = ga.luid;
+        }
+        if(renderNo == ga.no)
+        {
+            renderId = ga.luid;
         }
     }
+    SetGraphicsAdapters(captureId, renderId);
+    m_defaultAdapter = (captureNo == 0 && renderNo == 0);
+    m_captureDevice  = nullptr;
+    m_renderDevice   = nullptr;
+
+    Sleep(1000);
+    if(active)
+        StartSession();
+}
+
+LUID CaptureManager::GetAdapterLuid(winrt::com_ptr<ID3D11Device> device)
+{
+    auto                         dxgiDevice = device.as<IDXGIDevice>();
+    winrt::com_ptr<IDXGIAdapter> adapter;
+    if(SUCCEEDED(dxgiDevice->GetAdapter(adapter.put())))
+    {
+        DXGI_ADAPTER_DESC desc;
+        if(SUCCEEDED(adapter->GetDesc(&desc)))
+        {
+            return desc.AdapterLuid;
+        }
+    }
+    return LUID();
 }

@@ -18,6 +18,8 @@ GNU General Public License v3.0
 #define MAX_RECENT_PROFILES 20U
 #define MAX_RECENT_IMPORTS 20U
 #define MAX_SUBFRAMES 10U
+#define MAX_GPU 4U
+#define MAX_GPUS 17U
 
 #define WM_PIXEL_SIZE(i) (static_cast<UINT>(WM_USER) + i)
 #define WM_ASPECT_RATIO(i) (static_cast<UINT> WM_PIXEL_SIZE(MAX_PIXEL_SIZES) + i)
@@ -30,8 +32,11 @@ GNU General Public License v3.0
 #define WM_RECENT_IMPORT(i) (static_cast<UINT> WM_RECENT_PROFILE(MAX_RECENT_PROFILES) + i)
 #define WM_CAPTURE_DEVICE_FORMAT(i) (static_cast<UINT> WM_RECENT_IMPORT(MAX_RECENT_IMPORTS) + i)
 #define WM_SUBFRAMES(i) (static_cast<UINT> WM_CAPTURE_DEVICE_FORMAT(MAX_CAPTURE_DEVICE_FORMATS) + i)
+#define WM_GPU(ci, ri) (static_cast<UINT> WM_SUBFRAMES(MAX_SUBFRAMES) + (ci << 2) + ri)
 
 #define CUSTOM_MNEMONIC "Custom"
+
+#define FORCE_FLIPMODE
 
 struct PixelSizeInfo
 {
@@ -117,10 +122,13 @@ struct CaptureDevice
 
 struct GraphicsAdapter
 {
-    unsigned      no;
-    std::wstring  name;
-    std::wstring  id;
-    IDXGIAdapter* adapter;
+    unsigned                     no;
+    std::wstring                 name;
+    winrt::com_ptr<IDXGIAdapter> adapter;
+    LUID                         luid;
+
+    bool capture;
+    bool render;
 };
 
 struct HotkeyInfo
