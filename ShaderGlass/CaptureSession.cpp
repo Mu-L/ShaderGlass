@@ -37,7 +37,8 @@ CaptureSession::CaptureSession(winrt::com_ptr<ID3D11Device>      captureDevice,
     m_device        = CreateDirect3DDevice(dxgiDevice.get());
 
     m_contentSize = m_item.Size();
-    m_framePool   = winrt::Direct3D11CaptureFramePool::CreateFreeThreaded(m_device, pixelFormat, 2, m_contentSize);
+    //m_framePool   = winrt::Direct3D11CaptureFramePool::CreateFreeThreaded(m_device, pixelFormat, 2, m_contentSize);
+    m_framePool = winrt::Direct3D11CaptureFramePool::Create(m_device, pixelFormat, 2, m_contentSize);
     m_session     = m_framePool.CreateCaptureSession(m_item);
 
     // try to disable yellow border
@@ -56,7 +57,7 @@ CaptureSession::CaptureSession(winrt::com_ptr<ID3D11Device>      captureDevice,
         try
         {
             // max 250Hz?
-            const auto minInterval = maxCaptureRate ? std::chrono::milliseconds(4) : std::chrono::milliseconds(15);
+            const auto minInterval = maxCaptureRate ? std::chrono::milliseconds(1) : std::chrono::milliseconds(15);
             m_session.MinUpdateInterval(winrt::Windows::Foundation::TimeSpan(minInterval));
         }
         catch(...)
@@ -64,7 +65,7 @@ CaptureSession::CaptureSession(winrt::com_ptr<ID3D11Device>      captureDevice,
     }
 
     Reset();
-    m_framePool.FrameArrived({this, &CaptureSession::OnFrameArrived});
+    //m_framePool.FrameArrived({this, &CaptureSession::OnFrameArrived});
     m_session.StartCapture();
 
     WINRT_ASSERT(m_session != nullptr);
@@ -97,6 +98,8 @@ void CaptureSession::OnFrameArrived(winrt::Direct3D11CaptureFramePool const& sen
         return;
 
     auto frame      = sender.TryGetNextFrame();
+    if(!frame)
+        return;
     auto inputFrame = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame.Surface());
 
     auto contentSize = frame.ContentSize();
@@ -111,7 +114,7 @@ void CaptureSession::OnFrameArrived(winrt::Direct3D11CaptureFramePool const& sen
 
     m_textureBridge.PutInputFrame(inputFrame, resized);
 
-    SetEvent(m_frameEvent);
+    //SetEvent(m_frameEvent);
     OnInputFrame();
 }
 
@@ -137,6 +140,7 @@ void CaptureSession::ProcessInput()
     }
     else
     {
+        OnFrameArrived(m_framePool, nullptr);
         m_shaderGlass.Process(m_textureBridge.GetInputFrame(), m_frameTicks, m_numInputFrames);
     }
 }

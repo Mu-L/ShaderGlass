@@ -386,6 +386,9 @@ void CaptureManager::Exit()
         m_shaderGlass->Stop();
         delete m_shaderGlass.release();
 
+        m_renderContext->ClearState();
+        m_renderContext->Flush();
+
         if(m_debug)
         {
             m_debug->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL | D3D11_RLDO_IGNORE_INTERNAL);
@@ -629,6 +632,8 @@ void CaptureManager::SetGraphicsAdapters(int captureNo, int renderNo, LUID& capt
     m_defaultAdapter = (captureNo == 0 && renderNo == 0);
     m_captureDevice  = nullptr;
     m_renderDevice   = nullptr;
+
+    Sleep(1000);
     if(active)
         StartSession();
 }

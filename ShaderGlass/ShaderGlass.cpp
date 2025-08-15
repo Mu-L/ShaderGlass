@@ -12,7 +12,7 @@ GNU General Public License v3.0
 #include "Helpers.h"
 #include "resource.h"
 
-#define TIMING_DUMP
+//#define TIMING_DUMP
 
 static HRESULT     hr;
 static const float background_colour[4] = {0, 0, 0, 1.0f};
@@ -31,7 +31,9 @@ ShaderGlass::~ShaderGlass()
     DestroyPasses();
     DestroyTargets();
 
+    m_context->ClearState();
     m_context->Flush();
+    m_context = nullptr;
 }
 
 void ShaderGlass::Initialize(HWND                                outputWindow,

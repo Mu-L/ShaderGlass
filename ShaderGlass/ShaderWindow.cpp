@@ -1328,7 +1328,7 @@ void ShaderWindow::UpdateTitle()
             snprintf(inFPSdisplay, 20, "%d->", inFPS);
         _snwprintf_s(title,
                      200,
-                     _T("ShaderGlass (%s%S, %Spx, %S%%, ~%S, %S%dfps%S)"),
+                     _T("ShaderGlass/BFI (%s%S, %Spx, %S%%, ~%S, %S%dfps%S)"),
                      windowName,
                      shader->Name.c_str(),
                      pixelSize.mnemonic,
@@ -1341,7 +1341,7 @@ void ShaderWindow::UpdateTitle()
     }
     else
     {
-        SetWindowTextW(m_mainWindow, _T("ShaderGlass (stopped)"));
+        SetWindowTextW(m_mainWindow, _T("ShaderGlass/BFI (stopped)"));
     }
 }
 
@@ -2063,8 +2063,8 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
                     auto captureNo = (wmId - WM_GPU(0, 0)) / MAX_GPU;
                     auto renderNo  = (wmId - WM_GPU(0, 0)) % MAX_GPU;
                     LUID captureId, renderId;
-                    m_captureManager.SetGraphicsAdapters(captureNo, renderNo, captureId, renderId);
                     SaveGPUs(captureId, renderId);
+                    m_captureManager.SetGraphicsAdapters(captureNo, renderNo, captureId, renderId);
                     UpdateGPUName();
                 }
             }
@@ -2634,7 +2634,7 @@ void ShaderWindow::SaveMaxCaptureRateState(bool state)
 
 bool ShaderWindow::GetMaxCaptureRateState()
 {
-    return GetRegistryOption(TEXT("Max Capture Rate"), false);
+    return GetRegistryOption(TEXT("Max Capture Rate"), true);
 }
 
 void ShaderWindow::SaveUseHDRState(bool state)
