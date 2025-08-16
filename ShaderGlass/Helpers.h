@@ -22,3 +22,4 @@ bool         CanDisableBorder();
 bool         CanSetCaptureRate();
 bool         CanUpdateCursor();
 int32_t      GetTicks();
+int32_t      ToTicks(int64_t rep);

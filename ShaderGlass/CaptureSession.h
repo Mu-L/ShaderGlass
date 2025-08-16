@@ -33,6 +33,22 @@ private:
     winrt::com_ptr<ID3D11Texture2D>     m_sharedFrame {nullptr};
 };
 
+class TextureQueue
+{
+public:
+    TextureQueue(winrt::com_ptr<ID3D11Device> captureDevice);
+    ~TextureQueue();
+
+    void                            PutInputFrame(winrt::com_ptr<ID3D11Texture2D> inputFrame, uint32_t ticks, bool resized);
+    winrt::com_ptr<ID3D11Texture2D> GetInputFrame(uint32_t nowTicks, uint32_t delay);
+
+private:
+    winrt::com_ptr<ID3D11Device>        m_captureDevice {nullptr};
+    winrt::com_ptr<ID3D11DeviceContext> m_captureContext {nullptr};
+
+    std::deque<std::pair<uint32_t, winrt::com_ptr<ID3D11Texture2D>>> m_frames;
+};
+
 class CaptureSession
 {
 public:
@@ -78,5 +94,6 @@ private:
     int                                                            m_prevInputFrames {0};
     HANDLE                                                         m_frameEvent {nullptr};
     ShaderGlass&                                                   m_shaderGlass;
-    TextureBridge                                                  m_textureBridge;
+    //TextureBridge                                                  m_textureBridge;
+    TextureQueue m_textureQueue;
 };

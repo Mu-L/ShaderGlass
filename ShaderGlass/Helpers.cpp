@@ -109,10 +109,21 @@ bool CanUpdateCursor()
     }
 }
 
+static LARGE_INTEGER freq {.QuadPart = 0};
+static LARGE_INTEGER startTicks {.QuadPart = 0};
+
+int32_t ToTicks(int64_t rep)
+{
+    if(freq.QuadPart == 0)
+    {
+        return 0;
+    }
+
+    return (int32_t)((rep - startTicks.QuadPart) / (freq.QuadPart / TICKS_PER_SEC));
+}
+
 int32_t GetTicks()
 {
-    static LARGE_INTEGER freq {.QuadPart = 0};
-    static LARGE_INTEGER startTicks {.QuadPart = 0};
     if(freq.QuadPart == 0)
     {
         QueryPerformanceFrequency(&freq);

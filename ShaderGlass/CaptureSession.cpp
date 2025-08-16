@@ -31,15 +31,15 @@ CaptureSession::CaptureSession(winrt::com_ptr<ID3D11Device>      captureDevice,
                                ShaderGlass&                      shaderGlass,
                                bool                              maxCaptureRate,
                                HANDLE                            frameEvent) :
-    m_device {nullptr}, m_item {item}, m_pixelFormat {pixelFormat}, m_shaderGlass {shaderGlass}, m_textureBridge {captureDevice, renderDevice}, m_frameEvent(frameEvent)
+    m_device {nullptr}, m_item {item}, m_pixelFormat {pixelFormat}, m_shaderGlass {shaderGlass}, m_textureQueue {captureDevice}, m_frameEvent(frameEvent)
 {
     auto dxgiDevice = captureDevice.as<IDXGIDevice>();
     m_device        = CreateDirect3DDevice(dxgiDevice.get());
 
     m_contentSize = m_item.Size();
-    //m_framePool   = winrt::Direct3D11CaptureFramePool::CreateFreeThreaded(m_device, pixelFormat, 2, m_contentSize);
-    m_framePool = winrt::Direct3D11CaptureFramePool::Create(m_device, pixelFormat, 2, m_contentSize);
-    m_session     = m_framePool.CreateCaptureSession(m_item);
+    //m_framePool   = winrt::Direct3D11CaptureFramePool::CreateFreeThreaded(m_device, pixelFormat, 5, m_contentSize);
+    m_framePool = winrt::Direct3D11CaptureFramePool::Create(m_device, pixelFormat, 10, m_contentSize);
+    m_session = m_framePool.CreateCaptureSession(m_item);
 
     // try to disable yellow border
     if(CanDisableBorder())
@@ -57,7 +57,7 @@ CaptureSession::CaptureSession(winrt::com_ptr<ID3D11Device>      captureDevice,
         try
         {
             // max 250Hz?
-            const auto minInterval = maxCaptureRate ? std::chrono::milliseconds(1) : std::chrono::milliseconds(15);
+            const auto minInterval = maxCaptureRate ? std::chrono::milliseconds(1) : std::chrono::milliseconds(1);
             m_session.MinUpdateInterval(winrt::Windows::Foundation::TimeSpan(minInterval));
         }
         catch(...)
@@ -72,7 +72,7 @@ CaptureSession::CaptureSession(winrt::com_ptr<ID3D11Device>      captureDevice,
 }
 
 CaptureSession::CaptureSession(winrt::com_ptr<ID3D11Texture2D> inputImage, ShaderGlass& shaderGlass, HANDLE frameEvent) :
-    m_device {nullptr}, m_inputImage {inputImage}, m_shaderGlass {shaderGlass}, m_textureBridge {nullptr, nullptr}, m_frameEvent {frameEvent}
+    m_device {nullptr}, m_inputImage {inputImage}, m_shaderGlass {shaderGlass}, m_textureQueue {nullptr}, m_frameEvent {frameEvent}
 {
     Reset();
     ProcessInput();
@@ -97,10 +97,17 @@ void CaptureSession::OnFrameArrived(winrt::Direct3D11CaptureFramePool const& sen
     if(!m_session)
         return;
 
-    auto frame      = sender.TryGetNextFrame();
+    auto frame = sender.TryGetNextFrame();
     if(!frame)
         return;
     auto inputFrame = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame.Surface());
+
+    auto ts = frame.SystemRelativeTime().count();
+    auto tst = ToTicks((int64_t)(ts));
+    auto tckt = GetTicks();
+
+    LARGE_INTEGER ticka;
+    QueryPerformanceCounter(&ticka);
 
     auto contentSize = frame.ContentSize();
     auto resized     = false;
@@ -112,7 +119,7 @@ void CaptureSession::OnFrameArrived(winrt::Direct3D11CaptureFramePool const& sen
         resized = true;
     }
 
-    m_textureBridge.PutInputFrame(inputFrame, resized);
+    m_textureQueue.PutInputFrame(inputFrame, tst /*GetTicks()*/, resized);
 
     //SetEvent(m_frameEvent);
     OnInputFrame();
@@ -141,7 +148,7 @@ void CaptureSession::ProcessInput()
     else
     {
         OnFrameArrived(m_framePool, nullptr);
-        m_shaderGlass.Process(m_textureBridge.GetInputFrame(), m_frameTicks, m_numInputFrames);
+        m_shaderGlass.Process(m_textureQueue.GetInputFrame(GetTicks(), 1000), m_frameTicks, m_numInputFrames);
     }
 }
 
@@ -267,4 +274,52 @@ winrt::com_ptr<ID3D11Texture2D> TextureBridge::GetInputFrame()
         }
     }
     return m_inputFrame;
+}
+
+TextureQueue::TextureQueue(winrt::com_ptr<ID3D11Device> captureDevice) : m_captureDevice {captureDevice}
+{
+    m_captureDevice->GetImmediateContext(m_captureContext.put());
+}
+
+TextureQueue::~TextureQueue() { }
+
+void TextureQueue::PutInputFrame(winrt::com_ptr<ID3D11Texture2D> inputFrame, uint32_t ticks, bool resized)
+{
+    D3D11_TEXTURE2D_DESC inputDesc;
+    inputFrame->GetDesc(&inputDesc);
+
+    winrt::com_ptr<ID3D11Texture2D> queuedFrame;
+
+    auto hr = m_captureDevice->CreateTexture2D(&inputDesc, nullptr, queuedFrame.put());
+    assert(SUCCEEDED(hr));
+
+    m_captureContext->CopyResource(queuedFrame.get(), inputFrame.get());
+
+    m_frames.push_back(std::make_pair(ticks, queuedFrame));
+}
+
+winrt::com_ptr<ID3D11Texture2D> TextureQueue::GetInputFrame(uint32_t nowTicks, uint32_t delay)
+{
+    // get latest frame at least "delay" old
+    if(m_frames.size())
+    {
+        auto& it = m_frames.rbegin();
+        do
+        {
+            if(it->first <= nowTicks - delay)
+            {
+                auto frame = it->second;
+
+                // delete everything before that
+                int drop_count = 0;
+                while(++it != m_frames.rend())
+                    drop_count++;
+                while(drop_count-- > 0)
+                    m_frames.pop_front();
+
+                return frame;
+            }
+        } while(++it != m_frames.rend());
+    }
+    return nullptr;
 }

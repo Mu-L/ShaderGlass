@@ -18,6 +18,7 @@
 #include <iostream>
 #include <sstream>
 #include <mutex>
+#include <deque>
 
 #include <Unknwn.h>
 #include <inspectable.h>
