@@ -488,6 +488,7 @@ void ShaderGlass::Process(winrt::com_ptr<ID3D11Texture2D> texture, ULONGLONG fra
         memset(_postPresentTicks, 0, sizeof(_postPresentTicks));
         memset(_frameNo, 0, sizeof(_frameNo));
         memset(_subFrameNo, 0, sizeof(_subFrameNo));
+        memset(_frameTicks, 0, sizeof(_frameTicks));
         memset(_fracFrame, 0, sizeof(_fracFrame));
         _timingIndex = 0;
 #endif

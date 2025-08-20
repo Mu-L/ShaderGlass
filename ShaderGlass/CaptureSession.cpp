@@ -39,7 +39,7 @@ CaptureSession::CaptureSession(winrt::com_ptr<ID3D11Device>      captureDevice,
     m_contentSize = m_item.Size();
     //m_framePool   = winrt::Direct3D11CaptureFramePool::CreateFreeThreaded(m_device, pixelFormat, 5, m_contentSize);
     m_framePool = winrt::Direct3D11CaptureFramePool::Create(m_device, pixelFormat, 10, m_contentSize);
-    m_session = m_framePool.CreateCaptureSession(m_item);
+    m_session   = m_framePool.CreateCaptureSession(m_item);
 
     // try to disable yellow border
     if(CanDisableBorder())
@@ -92,6 +92,11 @@ void CaptureSession::UpdateCursor(bool captureCursor)
         m_session.IsCursorCaptureEnabled(captureCursor);
 }
 
+#define TIMING_BUFLEN 1200
+int     _captureIndex = 0;
+int32_t _arriveTicks[TIMING_BUFLEN];
+int32_t _srtTicks[TIMING_BUFLEN];
+
 void CaptureSession::OnFrameArrived(winrt::Direct3D11CaptureFramePool const& sender, winrt::IInspectable const&)
 {
     if(!m_session)
@@ -102,12 +107,21 @@ void CaptureSession::OnFrameArrived(winrt::Direct3D11CaptureFramePool const& sen
         return;
     auto inputFrame = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame.Surface());
 
-    auto ts = frame.SystemRelativeTime().count();
-    auto tst = ToTicks((int64_t)(ts));
+    auto ts   = frame.SystemRelativeTime().count();
+    auto tst  = ToTicks((int64_t)(ts));
     auto tckt = GetTicks();
 
-    LARGE_INTEGER ticka;
-    QueryPerformanceCounter(&ticka);
+    _arriveTicks[_captureIndex] = tckt;
+    _srtTicks[_captureIndex]    = tst;
+
+    if(tst > tckt)
+    {
+        int hu = 0;
+        hu++;
+    }
+
+    //    LARGE_INTEGER ticka;
+    //  QueryPerformanceCounter(&ticka);
 
     auto contentSize = frame.ContentSize();
     auto resized     = false;
@@ -119,10 +133,24 @@ void CaptureSession::OnFrameArrived(winrt::Direct3D11CaptureFramePool const& sen
         resized = true;
     }
 
-    m_textureQueue.PutInputFrame(inputFrame, tst /*GetTicks()*/, resized);
+    _captureIndex++;
+    if(_captureIndex == TIMING_BUFLEN)
+    {
+        // save & exit
+        std::ofstream o(L"c:\\temp\\sg-capture.csv");
+        o << "ArriveTicks" << "," << "ReportedTicks" << std::endl;
+        for(int i = 0; i < _captureIndex; i++)
+        {
+            o << _arriveTicks[i] << "," << _srtTicks[i] << std::endl;
+        }
+        o.close();
+        abort();
+    }
+
+    //    m_textureQueue.PutInputFrame(inputFrame, tst /*GetTicks()*/, resized);
 
     //SetEvent(m_frameEvent);
-    OnInputFrame();
+    //  OnInputFrame();
 }
 
 void CaptureSession::OnInputFrame()
@@ -148,7 +176,9 @@ void CaptureSession::ProcessInput()
     else
     {
         OnFrameArrived(m_framePool, nullptr);
-        m_shaderGlass.Process(m_textureQueue.GetInputFrame(GetTicks(), 1000), m_frameTicks, m_numInputFrames);
+///        uint32_t frameTicks;
+   //     auto     frame = m_textureQueue.GetInputFrame(GetTicks(), 0, frameTicks);
+     //   m_shaderGlass.Process(frame, frameTicks, m_numInputFrames);
     }
 }
 
@@ -298,7 +328,7 @@ void TextureQueue::PutInputFrame(winrt::com_ptr<ID3D11Texture2D> inputFrame, uin
     m_frames.push_back(std::make_pair(ticks, queuedFrame));
 }
 
-winrt::com_ptr<ID3D11Texture2D> TextureQueue::GetInputFrame(uint32_t nowTicks, uint32_t delay)
+winrt::com_ptr<ID3D11Texture2D> TextureQueue::GetInputFrame(uint32_t nowTicks, uint32_t delay, uint32_t& frameTicks)
 {
     // get latest frame at least "delay" old
     if(m_frames.size())
@@ -309,6 +339,7 @@ winrt::com_ptr<ID3D11Texture2D> TextureQueue::GetInputFrame(uint32_t nowTicks, u
             if(it->first <= nowTicks - delay)
             {
                 auto frame = it->second;
+                frameTicks = it->first;
 
                 // delete everything before that
                 int drop_count = 0;
