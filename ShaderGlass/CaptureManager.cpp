@@ -139,15 +139,15 @@ bool CaptureManager::StartSession()
         }
 
         m_captureDevice = CreateD3DDevice(captureAdapter);
-        if(captureAdapter != nullptr && renderAdapter != nullptr && captureAdapter != renderAdapter)
+        //if(captureAdapter != nullptr && renderAdapter != nullptr && captureAdapter != renderAdapter)
         {
             m_renderDevice = CreateD3DDevice(renderAdapter);
             cross          = true;
         }
-        else
+        /*else
         {
             m_renderDevice = m_captureDevice;
-        }
+        }*/
         m_renderDevice->GetImmediateContext(m_renderContext.put());
 
         // mark GPUs

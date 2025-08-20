@@ -28,7 +28,7 @@
 #include <winrt/Windows.Graphics.Capture.h>
 #include <windows.graphics.capture.interop.h>
 
-#include <d3d11.h>
+#include <d3d11_1.h>
 #include <d3dcompiler.h>
 #include <dxgi1_6.h>
 #include <winrt/windows.graphics.directx.direct3d11.h>

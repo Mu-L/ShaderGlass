@@ -15,22 +15,24 @@ public:
     TextureBridge(winrt::com_ptr<ID3D11Device> captureDevice, winrt::com_ptr<ID3D11Device> renderDevice);
     ~TextureBridge();
 
-    void                            PutInputFrame(winrt::com_ptr<ID3D11Texture2D> inputFrame, bool resized);
-    winrt::com_ptr<ID3D11Texture2D> GetInputFrame();
+    void                            PutInputFrame(winrt::com_ptr<ID3D11Texture2D> inputFrame, uint32_t ticks, bool resized);
+    winrt::com_ptr<ID3D11Texture2D> GetInputFrame(uint32_t nowTicks, uint32_t delay, uint32_t& frameTicks);
 
 private:
-    winrt::com_ptr<ID3D11Texture2D>     m_inputFrame {nullptr};
-    winrt::com_ptr<ID3D11Device>        m_captureDevice {nullptr};
+    //    winrt::com_ptr<ID3D11Texture2D>                                  m_inputFrame {nullptr};
+    winrt::com_ptr<ID3D11Device1>        m_captureDevice {nullptr};
     winrt::com_ptr<ID3D11DeviceContext> m_captureContext {nullptr};
-    winrt::com_ptr<ID3D11Device>        m_renderDevice {nullptr};
+    winrt::com_ptr<ID3D11Device1>        m_renderDevice {nullptr};
     winrt::com_ptr<ID3D11DeviceContext> m_renderContext {nullptr};
-    D3D11_TEXTURE2D_DESC                m_inputFrameDesc;
-    volatile bool                       m_inputUpdated {false};
-    volatile bool                       m_inputResized {false};
-    void*                               m_inputData {nullptr};
-    size_t                              m_inputSize {0};
-    std::mutex                          m_inputMutex;
-    winrt::com_ptr<ID3D11Texture2D>     m_sharedFrame {nullptr};
+    // D3D11_TEXTURE2D_DESC                                             m_inputFrameDesc;
+    //    volatile bool                                                    m_inputUpdated {false};
+    //  volatile bool                                                    m_inputResized {false};
+    //   void*                                                            m_inputData {nullptr};
+    //   size_t                                                           m_inputSize {0};
+    // std::mutex                                                       m_inputMutex;
+    //  winrt::com_ptr<ID3D11Texture2D>                                  m_sharedFrame {nullptr};
+
+    std::deque<std::pair<uint32_t, winrt::com_ptr<ID3D11Texture2D>>> m_frames;
 };
 
 class TextureQueue
@@ -94,6 +96,5 @@ private:
     int                                                            m_prevInputFrames {0};
     HANDLE                                                         m_frameEvent {nullptr};
     ShaderGlass&                                                   m_shaderGlass;
-    //TextureBridge                                                  m_textureBridge;
-    TextureQueue m_textureQueue;
+    TextureBridge                                                  m_textureBridge;
 };
