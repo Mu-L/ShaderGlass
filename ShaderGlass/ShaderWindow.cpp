@@ -1655,7 +1655,7 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
                 CheckMenuItem(m_subFramesMenu, ID_SUBFRAME_SYNC, MF_CHECKED | MF_BYCOMMAND);
             else
                 CheckMenuItem(m_subFramesMenu, ID_SUBFRAME_SYNC, MF_UNCHECKED | MF_BYCOMMAND);
-            m_captureManager.UpdateSubFrames();
+            m_captureManager.UpdateSyncSubFrame();
             break;
         case ID_SUB_INTERNALVSYNC:
             m_captureOptions.internalVSync = !m_captureOptions.internalVSync;
