@@ -37,6 +37,7 @@ GNU General Public License v3.0
 #define CUSTOM_MNEMONIC "Custom"
 
 #define FORCE_FLIPMODE
+#define FORCE_MAXCAPTURE
 
 struct PixelSizeInfo
 {

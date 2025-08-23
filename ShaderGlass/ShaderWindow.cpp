@@ -1490,6 +1490,7 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
             }
             break;
         case ID_ADVANCED_MAXCAPTUREFRAMERATE:
+#ifndef FORCE_FLIPMODE
             if(GetMenuState(m_advancedMenu, ID_ADVANCED_MAXCAPTUREFRAMERATE, MF_BYCOMMAND) & MF_CHECKED)
             {
                 CheckMenuItem(m_advancedMenu, ID_ADVANCED_MAXCAPTUREFRAMERATE, MF_UNCHECKED);
@@ -1500,6 +1501,7 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
                 CheckMenuItem(m_advancedMenu, ID_ADVANCED_MAXCAPTUREFRAMERATE, MF_CHECKED);
                 SaveMaxCaptureRateState(true);
             }
+#endif
             break;
         case ID_ADVANCED_USEHDR:
             if(GetMenuState(m_advancedMenu, ID_ADVANCED_USEHDR, MF_BYCOMMAND) & MF_CHECKED)
@@ -2464,7 +2466,11 @@ bool ShaderWindow::Create(_In_ HINSTANCE hInstance, _In_ int nCmdShow)
     {
         if(GetMaxCaptureRateState())
         {
+#ifndef FORCE_MAXCAPTURE
+            EnableMenuItem(m_advancedMenu, ID_ADVANCED_MAXCAPTUREFRAMERATE, MF_BYCOMMAND | MF_ENABLED);            
+#endif
             CheckMenuItem(m_advancedMenu, ID_ADVANCED_MAXCAPTUREFRAMERATE, MF_BYCOMMAND | MF_CHECKED);
+
             m_captureOptions.maxCaptureRate = true;
         }
     }
@@ -2633,12 +2639,18 @@ bool ShaderWindow::GetTearingState()
 
 void ShaderWindow::SaveMaxCaptureRateState(bool state)
 {
+#ifndef FORCE_MAXCAPTURE
     SaveRegistryOption(TEXT("Max Capture Rate"), state);
+#endif
 }
 
 bool ShaderWindow::GetMaxCaptureRateState()
 {
+#ifdef FORCE_MAXCAPTURE
+    return true;
+#else
     return GetRegistryOption(TEXT("Max Capture Rate"), true);
+#endif
 }
 
 void ShaderWindow::SaveUseHDRState(bool state)
