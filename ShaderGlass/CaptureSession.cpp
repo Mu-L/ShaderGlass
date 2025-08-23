@@ -169,7 +169,10 @@ void CaptureSession::Stop()
 
 TextureBridge::TextureBridge(winrt::com_ptr<ID3D11Device> captureDevice, winrt::com_ptr<ID3D11Device> renderDevice) : m_captureDevice {captureDevice}, m_renderDevice {renderDevice}
 {
-    m_captureDevice->GetImmediateContext(m_captureContext.put());
+    if(m_captureDevice)
+    {
+        m_captureDevice->GetImmediateContext(m_captureContext.put());
+    }
     if(m_renderDevice)
     {
         m_renderDevice->GetImmediateContext(m_renderContext.put());

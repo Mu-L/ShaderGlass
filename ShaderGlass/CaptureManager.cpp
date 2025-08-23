@@ -231,7 +231,7 @@ bool CaptureManager::StartSession()
         if(!FindDeviceFormat(m_options.deviceFormatNo, di, fi))
             return false;
 
-        m_deviceCapture.Start(m_renderDevice, di->no, fi->no);
+        m_deviceCapture.Start(m_captureDevice, di->symlink, fi->no);
 
         // retrieve input image size
         auto                 inputTexture = m_deviceCapture.m_outputTexture;
