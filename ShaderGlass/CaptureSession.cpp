@@ -34,12 +34,14 @@ CaptureSession::CaptureSession(winrt::com_ptr<ID3D11Device>      captureDevice,
     m_device {nullptr}, m_item {item}, m_pixelFormat {pixelFormat}, m_shaderGlass {shaderGlass}, m_textureBridge {captureDevice, renderDevice}, m_frameEvent(frameEvent)
 {
     auto dxgiDevice = captureDevice.as<IDXGIDevice>();
+    auto hr = dxgiDevice->SetGPUThreadPriority(7);
+    assert(SUCCEEDED(hr));
     m_device        = CreateDirect3DDevice(dxgiDevice.get());
 
     m_contentSize = m_item.Size();
     //m_framePool   = winrt::Direct3D11CaptureFramePool::CreateFreeThreaded(m_device, pixelFormat, 2, m_contentSize);
-    m_framePool = winrt::Direct3D11CaptureFramePool::Create(m_device, pixelFormat, 2, m_contentSize);
-    m_session     = m_framePool.CreateCaptureSession(m_item);
+    m_framePool = winrt::Direct3D11CaptureFramePool::Create(m_device, pixelFormat, 4, m_contentSize);
+    m_session   = m_framePool.CreateCaptureSession(m_item);
 
     // try to disable yellow border
     if(CanDisableBorder())
@@ -59,6 +61,7 @@ CaptureSession::CaptureSession(winrt::com_ptr<ID3D11Device>      captureDevice,
             // max 250Hz?
             const auto minInterval = maxCaptureRate ? std::chrono::milliseconds(1) : std::chrono::milliseconds(15);
             m_session.MinUpdateInterval(winrt::Windows::Foundation::TimeSpan(minInterval));
+            m_session.MinUpdateInterval(winrt::Windows::Foundation::TimeSpan(0));
         }
         catch(...)
         { }
@@ -92,14 +95,14 @@ void CaptureSession::UpdateCursor(bool captureCursor)
         m_session.IsCursorCaptureEnabled(captureCursor);
 }
 
-void CaptureSession::OnFrameArrived(winrt::Direct3D11CaptureFramePool const& sender, winrt::IInspectable const&)
+bool CaptureSession::OnFrameArrived(winrt::Direct3D11CaptureFramePool const& sender, winrt::IInspectable const&)
 {
     if(!m_session)
-        return;
+        return false;
 
-    auto frame      = sender.TryGetNextFrame();
+    auto frame = sender.TryGetNextFrame();
     if(!frame)
-        return;
+        return false;
     auto inputFrame = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame.Surface());
 
     auto contentSize = frame.ContentSize();
@@ -108,7 +111,7 @@ void CaptureSession::OnFrameArrived(winrt::Direct3D11CaptureFramePool const& sen
     {
         m_contentSize.Width  = contentSize.Width;
         m_contentSize.Height = contentSize.Height;
-        m_framePool.Recreate(m_device, m_pixelFormat, 2, m_contentSize);
+        m_framePool.Recreate(m_device, m_pixelFormat, 4, m_contentSize);
         resized = true;
     }
 
@@ -116,6 +119,8 @@ void CaptureSession::OnFrameArrived(winrt::Direct3D11CaptureFramePool const& sen
 
     //SetEvent(m_frameEvent);
     OnInputFrame();
+
+    return true;
 }
 
 void CaptureSession::OnInputFrame()
@@ -140,7 +145,11 @@ void CaptureSession::ProcessInput()
     }
     else
     {
-        OnFrameArrived(m_framePool, nullptr);
+        auto arr = false;
+        do
+        {
+            arr = OnFrameArrived(m_framePool, nullptr);
+        } while(arr);
         m_shaderGlass.Process(m_textureBridge.GetInputFrame(), m_frameTicks, m_numInputFrames);
     }
 }
@@ -160,10 +169,10 @@ void CaptureSession::Stop()
 
 TextureBridge::TextureBridge(winrt::com_ptr<ID3D11Device> captureDevice, winrt::com_ptr<ID3D11Device> renderDevice) : m_captureDevice {captureDevice}, m_renderDevice {renderDevice}
 {
+    m_captureDevice->GetImmediateContext(m_captureContext.put());
     if(m_renderDevice)
     {
         m_renderDevice->GetImmediateContext(m_renderContext.put());
-        m_captureDevice->GetImmediateContext(m_captureContext.put());
     }
 }
 
@@ -228,7 +237,17 @@ void TextureBridge::PutInputFrame(winrt::com_ptr<ID3D11Texture2D> inputFrame, bo
     }
     else
     {
-        m_inputFrame = inputFrame;
+        HRESULT              hr;
+        D3D11_TEXTURE2D_DESC sharedDesc = {};
+        inputFrame->GetDesc(&sharedDesc);
+
+        winrt::com_ptr<ID3D11Texture2D> queuedFrame;
+        hr = m_captureDevice->CreateTexture2D(&sharedDesc, nullptr, queuedFrame.put());
+        assert(SUCCEEDED(hr));
+
+        m_captureContext->CopyResource(queuedFrame.get(), inputFrame.get());
+
+        m_inputFrame = queuedFrame;
     }
 }
 
