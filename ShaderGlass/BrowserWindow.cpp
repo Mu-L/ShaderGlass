@@ -822,7 +822,7 @@ LRESULT CALLBACK BrowserWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, 
 
 std::string BrowserWindow::DisplayName(const std::unique_ptr<PresetDef>& preset)
 {
-    return preset->RequiresSubFrames ? (preset->Name + " (>60Hz)") : preset->Name;
+    return preset->RequiresSubFrames ? (preset->Name + " (100Hz+)") : preset->Name;
 }
 
 bool BrowserWindow::Create(_In_ HINSTANCE hInstance, _In_ int nCmdShow, _In_ HWND shaderWindow, _In_ HWND paramsWindow)

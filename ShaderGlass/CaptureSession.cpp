@@ -41,6 +41,8 @@ CaptureSession::CaptureSession(winrt::com_ptr<ID3D11Device>      captureDevice,
     auto dxgiDevice = captureDevice.as<IDXGIDevice>();
     if(m_synchronous)
         dxgiDevice->SetGPUThreadPriority(7);
+    else
+        dxgiDevice->SetGPUThreadPriority(0);
     m_device = CreateDirect3DDevice(dxgiDevice.get());
 
     m_contentSize = m_item.Size();
