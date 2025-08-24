@@ -446,7 +446,7 @@ void ShaderWindow::LoadInputImage()
         auto prevState   = CheckMenuItem(m_inputMenu, ID_INPUT_FILE, MF_CHECKED | MF_BYCOMMAND);
         auto setDefaults = prevState != MF_CHECKED;
 
-        StartImage(setDefaults, setDefaults ? WM_PIXEL_SIZE(0) : 0);    
+        StartImage(setDefaults, setDefaults ? WM_PIXEL_SIZE(0) : 0);
     }
     EndDialog();
 }
@@ -634,7 +634,7 @@ void ShaderWindow::CompileThreadFunc()
             auto id      = m_captureManager.AddPreset(preset);
             m_numPresets = (unsigned int)m_captureManager.Presets().size();
             SendMessage(m_browserWindow, WM_COMMAND, WM_USER + 1, id);
-            SendMessage(m_mainWindow, WM_COMMAND, WM_SHADER(id), 0);
+            PostMessage(m_mainWindow, WM_COMMAND, WM_SHADER(id), 0);
         }
         catch(file_error& ex)
         {
@@ -869,8 +869,38 @@ void ShaderWindow::BuildProgramMenu()
     InsertMenu(m_programMenu, 14, MF_BYPOSITION | MF_STRING | MF_POPUP, (UINT_PTR)m_recentMenu, L"Recent profiles");
     LoadRecentProfiles();
 
-    m_hotkeysMenu  = GetSubMenu(m_programMenu, 3);
-    m_gpuMenu      = GetSubMenu(m_programMenu, 7);
+    m_hotkeysMenu = GetSubMenu(m_programMenu, 3);
+    m_gpuMenu     = GetSubMenu(m_programMenu, 7);
+
+    const auto& gpus = m_captureManager.GraphicsAdapters();
+    if(gpus.size() > 1)
+    {
+        int     gp = 1;
+        wchar_t name[100];
+        for(const auto& gpu : gpus)
+        {
+            _snwprintf_s(name, 100, L"#%d: %s", gpu.no, gpu.name.c_str());
+            InsertMenu(m_gpuMenu, gp++, MF_STRING, WM_GPU(gpu.no, gpu.no), name);
+        }
+
+#ifdef CROSS_GPU
+        // technically works but doesn't cleanly switch due to cleanup race conditions so disabling for now
+        m_crossMenu = CreatePopupMenu();
+        InsertMenu(m_gpuMenu, gp, MF_BYPOSITION | MF_STRING | MF_POPUP, (UINT_PTR)m_crossMenu, L"Cross GPU");
+
+        int cp = 0;
+        for(int ci = 0; ci < gpus.size(); ci++)
+            for(int ri = 0; ri < gpus.size(); ri++)
+                if(ci != ri)
+                {
+                    const auto& cg = gpus.at(ci);
+                    const auto& rg = gpus.at(ri);
+                    _snwprintf_s(name, 100, L"Capture #%d -> Render #%d", cg.no, rg.no);
+                    InsertMenu(m_crossMenu, cp++, MF_STRING, WM_GPU(cg.no, rg.no), name);
+                }
+#endif
+    }
+
     m_advancedMenu = GetSubMenu(m_programMenu, 10);
 }
 
@@ -933,7 +963,14 @@ void ShaderWindow::BuildOutputMenu()
 
     m_orientationMenu = GetSubMenu(m_outputMenu, 5);
 
-    InsertMenu(m_outputMenu, 6, MF_BYPOSITION | MF_STRING, ID_PROCESSING_FULLSCREEN, L"Fullscreen\tCtrl+Shift+G");
+    m_subFramesMenu = GetSubMenu(m_outputMenu, 6);
+    for(const auto& sf : subFrames)
+    {
+        AppendMenu(m_subFramesMenu, MF_STRING, sf.first, sf.second.text);
+    }
+    CheckMenuItem(m_subFramesMenu, WM_SUBFRAMES(0), MF_CHECKED | MF_BYCOMMAND);
+
+    InsertMenu(m_outputMenu, 7, MF_BYPOSITION | MF_STRING, ID_PROCESSING_FULLSCREEN, L"Fullscreen\tCtrl+Shift+G");
 }
 
 void ShaderWindow::BuildShaderMenu()
@@ -1279,16 +1316,23 @@ void ShaderWindow::UpdateTitle()
         char inFPSdisplay[20] = "";
         if(m_captureOptions.flipMode || m_captureOptions.maxCaptureRate)
             snprintf(inFPSdisplay, 20, "%d->", inFPS);
+        char outFPSdisplay[20] = "";
+        if(m_captureManager.ActiveSubFrames())
+            snprintf(outFPSdisplay, 20, "%d/%dfps", outFPS, m_captureManager.ActiveSubFrames());
+        else if(m_captureManager.Synchronous())
+            snprintf(outFPSdisplay, 20, "%d/Sfps", outFPS);
+        else
+            snprintf(outFPSdisplay, 20, "%dfps", outFPS);
         _snwprintf_s(title,
                      200,
-                     _T("ShaderGlass (%s%S, %Spx, %S%%, ~%S, %S%dfps%S)"),
+                     _T("ShaderGlass (%s%S, %Spx, %S%%, ~%S, %S%S%S)"),
                      windowName,
                      shader->Name.c_str(),
                      pixelSize.mnemonic,
                      scaleString,
                      aspectRatio.mnemonic,
                      inFPSdisplay,
-                     outFPS,
+                     outFPSdisplay,
                      advancedFlags);
         SetWindowTextW(m_mainWindow, title);
     }
@@ -1417,6 +1461,7 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
             }
             break;
         case ID_PRESENTATION_USEFLIPMODE:
+#ifndef FORCE_FLIPMODE
             if(GetMenuState(m_advancedMenu, ID_PRESENTATION_USEFLIPMODE, MF_BYCOMMAND) & MF_CHECKED)
             {
                 CheckMenuItem(m_advancedMenu, ID_PRESENTATION_USEFLIPMODE, MF_UNCHECKED);
@@ -1427,6 +1472,7 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
                 CheckMenuItem(m_advancedMenu, ID_PRESENTATION_USEFLIPMODE, MF_CHECKED);
                 SaveFlipModeState(true);
             }
+#endif
             break;
         case ID_ADVANCED_ALLOWTEARING:
             if(GetMenuState(m_advancedMenu, ID_ADVANCED_ALLOWTEARING, MF_BYCOMMAND) & MF_CHECKED)
@@ -1441,6 +1487,7 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
             }
             break;
         case ID_ADVANCED_MAXCAPTUREFRAMERATE:
+#ifndef FORCE_FLIPMODE
             if(GetMenuState(m_advancedMenu, ID_ADVANCED_MAXCAPTUREFRAMERATE, MF_BYCOMMAND) & MF_CHECKED)
             {
                 CheckMenuItem(m_advancedMenu, ID_ADVANCED_MAXCAPTUREFRAMERATE, MF_UNCHECKED);
@@ -1451,6 +1498,7 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
                 CheckMenuItem(m_advancedMenu, ID_ADVANCED_MAXCAPTUREFRAMERATE, MF_CHECKED);
                 SaveMaxCaptureRateState(true);
             }
+#endif
             break;
         case ID_ADVANCED_USEHDR:
             if(GetMenuState(m_advancedMenu, ID_ADVANCED_USEHDR, MF_BYCOMMAND) & MF_CHECKED)
@@ -1458,6 +1506,7 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
                 CheckMenuItem(m_advancedMenu, ID_ADVANCED_USEHDR, MF_UNCHECKED);
                 SaveUseHDRState(false);
 
+#ifndef FORCE_FLIPMODE
                 EnableMenuItem(m_advancedMenu, ID_PRESENTATION_USEFLIPMODE, MF_BYCOMMAND | MF_ENABLED);
 
                 if(GetFlipModeState())
@@ -1468,14 +1517,17 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
                 {
                     CheckMenuItem(m_advancedMenu, ID_PRESENTATION_USEFLIPMODE, MF_UNCHECKED);
                 }
+#endif
             }
             else
             {
                 CheckMenuItem(m_advancedMenu, ID_ADVANCED_USEHDR, MF_CHECKED);
                 SaveUseHDRState(true);
 
+#ifndef FORCE_FLIPMODE
                 CheckMenuItem(m_advancedMenu, ID_PRESENTATION_USEFLIPMODE, MF_BYCOMMAND | MF_CHECKED);
                 EnableMenuItem(m_advancedMenu, ID_PRESENTATION_USEFLIPMODE, MF_BYCOMMAND | MF_GRAYED);
+#endif
             }
             break;
         case ID_DESKTOP_LOCKINPUTAREA:
@@ -1555,6 +1607,9 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
         case IDM_SHADER_RANDOM:
             SendMessage(hWnd, WM_COMMAND, WM_SHADER(rand() % m_numPresets), 0);
             break;
+        case ID_GPU_DEFAULT:
+            SendMessage(hWnd, WM_COMMAND, WM_GPU(0, 0), 0);
+            break;
         case IDM_FULLSCREEN:
             ToggleBorderless(hWnd);
             break;
@@ -1591,6 +1646,14 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
             else
                 CheckMenuItem(m_flipMenu, IDM_FLIP_VERTICAL, MF_UNCHECKED | MF_BYCOMMAND);
             m_captureManager.UpdateOutputFlip();
+            break;
+        case ID_SUBFRAME_SYNC:
+            m_captureOptions.syncSubFrame = !m_captureOptions.syncSubFrame;
+            if(m_captureOptions.syncSubFrame)
+                CheckMenuItem(m_subFramesMenu, ID_SUBFRAME_SYNC, MF_CHECKED | MF_BYCOMMAND);
+            else
+                CheckMenuItem(m_subFramesMenu, ID_SUBFRAME_SYNC, MF_UNCHECKED | MF_BYCOMMAND);
+            m_captureManager.UpdateSyncSubFrame();
             break;
         case ID_ORIENTATION_HORIZONTAL:
         case ID_ORIENTATION_VERTICAL: {
@@ -1782,7 +1845,7 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
                 UnregisterHotkeys();
             }
 
-            auto& hk      = m_hotkeys.at(wmId);
+            auto& hk = m_hotkeys.at(wmId);
             StartDialog();
             hk.currentKey = m_hotkeyDialog->GetHotkey(hk.name, hk.currentKey);
             EndDialog();
@@ -1801,8 +1864,19 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
                 if(wmId >= WM_SHADER(0) && wmId < WM_SHADER(MAX_SHADERS))
                 {
                     PostMessage(m_browserWindow, WM_COMMAND, WM_USER, wmId + (lParam << 16));
-                    m_captureOptions.presetNo = wmId - WM_SHADER(0);
-                    m_captureManager.UpdateShaderPreset();
+                    auto newPresetNo = wmId - WM_SHADER(0);
+                    if(m_captureManager.RestartRequired(newPresetNo))
+                    {
+                        m_captureManager.StopSession();
+                        m_captureOptions.presetNo = newPresetNo;
+                        m_captureManager.StartSession();
+                    }
+                    else
+                    {
+                        m_captureOptions.presetNo = newPresetNo;
+                        m_captureManager.UpdateShaderPreset();
+                    }
+
                     UpdateWindowState();
                     if(wmId != WM_SHADER(0) && m_toggledNone)
                     {
@@ -1885,6 +1959,15 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
                     m_captureManager.UpdatePixelSize();
                     UpdateWindowState();
                     SendMessage(m_browserWindow, WM_COMMAND, WM_USER + 2, m_selectedPixelSize);
+                    break;
+                }
+                const auto& subFrame = subFrames.find(wmId);
+                if(subFrame != subFrames.end())
+                {
+                    m_selectedSubFrames = wmId - WM_SUBFRAMES(0);
+                    CheckMenuRadioItem(m_subFramesMenu, WM_SUBFRAMES(0), WM_SUBFRAMES(static_cast<UINT>(subFrames.size() - 1)), wmId, MF_BYCOMMAND);
+                    m_captureOptions.subFrames = subFrame->second.s;
+                    m_captureManager.UpdateSubFrames();
                     break;
                 }
                 const auto& outputScale = outputScales.find(wmId);
@@ -1977,6 +2060,15 @@ LRESULT CALLBACK ShaderWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, L
 
                     StartImage(setDefaults, setDefaults ? WM_PIXEL_SIZE(3) : 0);
                     break;
+                }
+                if(wmId >= WM_GPU(0, 0) && wmId <= WM_GPU(MAX_GPU, MAX_GPU))
+                {
+                    auto captureNo = (wmId - WM_GPU(0, 0)) / MAX_GPU;
+                    auto renderNo  = (wmId - WM_GPU(0, 0)) % MAX_GPU;
+                    LUID captureId, renderId;
+                    SaveGPUs(captureId, renderId);
+                    m_captureManager.SetGraphicsAdapters(captureNo, renderNo, captureId, renderId);
+                    UpdateGPUName();
                 }
             }
             return DefWindowProc(hWnd, message, wParam, lParam);
@@ -2343,13 +2435,17 @@ bool ShaderWindow::Create(_In_ HINSTANCE hInstance, _In_ int nCmdShow)
         CheckMenuItem(m_advancedMenu, ID_ADVANCED_USEHDR, MF_BYCOMMAND | MF_CHECKED);
         m_captureOptions.useHDR = true;
 
+#ifndef FORCE_FLIPMODE
         CheckMenuItem(m_advancedMenu, ID_PRESENTATION_USEFLIPMODE, MF_BYCOMMAND | MF_CHECKED);
         EnableMenuItem(m_advancedMenu, ID_PRESENTATION_USEFLIPMODE, MF_BYCOMMAND | MF_GRAYED);
+#endif
         m_captureOptions.flipMode = true;
     }
     else if(GetFlipModeState())
     {
+#ifndef FORCE_FLIPMODE
         EnableMenuItem(m_advancedMenu, ID_PRESENTATION_USEFLIPMODE, MF_BYCOMMAND | MF_ENABLED);
+#endif
         CheckMenuItem(m_advancedMenu, ID_PRESENTATION_USEFLIPMODE, MF_BYCOMMAND | MF_CHECKED);
         m_captureOptions.flipMode = true;
     }
@@ -2366,11 +2462,16 @@ bool ShaderWindow::Create(_In_ HINSTANCE hInstance, _In_ int nCmdShow)
     {
         CheckMenuItem(m_frameSkipMenu, ID_FPS_REMEMBERFPS, MF_BYCOMMAND | MF_CHECKED);
     }
+    LoadGPUs();
     if(CanSetCaptureRate())
     {
         if(GetMaxCaptureRateState())
         {
+#ifndef FORCE_MAXCAPTURE
+            EnableMenuItem(m_advancedMenu, ID_ADVANCED_MAXCAPTUREFRAMERATE, MF_BYCOMMAND | MF_ENABLED);
+#endif
             CheckMenuItem(m_advancedMenu, ID_ADVANCED_MAXCAPTUREFRAMERATE, MF_BYCOMMAND | MF_CHECKED);
+
             m_captureOptions.maxCaptureRate = true;
         }
     }
@@ -2382,10 +2483,56 @@ bool ShaderWindow::Create(_In_ HINSTANCE hInstance, _In_ int nCmdShow)
     m_captureOptions.monitor      = nullptr;
     m_captureOptions.outputWindow = m_mainWindow;
 
+    // default subframes
+    {
+        DEVMODE lpDevMode;
+        ZeroMemory(&lpDevMode, sizeof(DEVMODE));
+        lpDevMode.dmSize        = sizeof(DEVMODE);
+        lpDevMode.dmDriverExtra = 0;
+
+        int subframe = WM_SUBFRAMES(0);
+        if(EnumDisplaySettings(NULL, ENUM_CURRENT_SETTINGS, &lpDevMode) != 0)
+        {
+            int refreshRate = lpDevMode.dmDisplayFrequency;
+            if(refreshRate >= 95)
+            {
+                int subframes = 0;
+                for(int sf = 2; sf <= 9; sf++)
+                {
+                    // 60 Hz base
+                    if(abs(sf * 60 - refreshRate) <= 2)
+                    {
+                        subframes = sf;
+                        break;
+                    }
+                    // 50 Hz base
+                    if(abs(sf * 50 - refreshRate) <= 2)
+                    {
+                        subframes = sf;
+                        break;
+                    }
+                }
+                if(subframes)
+                {
+                    for(const auto& sf : subFrames)
+                    {
+                        if(sf.second.s == subframes)
+                            subframe = sf.first;
+                    }
+                }
+            }
+        }
+        SendMessage(m_mainWindow, WM_COMMAND, subframe, 0);
+    }
+
     if(!LoadDefault())
     {
-        // set defaults
+// set defaults
+#ifdef BFI_ALPHA
+        SendMessage(m_mainWindow, WM_COMMAND, WM_PIXEL_SIZE(0), 0);
+#else
         SendMessage(m_mainWindow, WM_COMMAND, WM_PIXEL_SIZE(3), 0);
+#endif
         SendMessage(m_mainWindow, WM_COMMAND, WM_ASPECT_RATIO(0), 0);
         auto defaultNo = m_captureManager.FindByName(defaultPreset);
         if(defaultNo != -1)
@@ -2487,12 +2634,18 @@ bool ShaderWindow::GetHotkeyState()
 
 void ShaderWindow::SaveFlipModeState(bool state)
 {
+#ifndef FORCE_FLIPMODE
     SaveRegistryOption(TEXT("Use Flip Mode"), state);
+#endif
 }
 
 bool ShaderWindow::GetFlipModeState()
 {
+#ifdef FORCE_FLIPMODE
+    return true;
+#else
     return GetRegistryOption(TEXT("Use Flip Mode"), false);
+#endif
 }
 
 void ShaderWindow::SaveTearingState(bool state)
@@ -2502,17 +2655,27 @@ void ShaderWindow::SaveTearingState(bool state)
 
 bool ShaderWindow::GetTearingState()
 {
+#ifdef FORCE_FLIPMODE
+    return false;
+#else
     return GetRegistryOption(TEXT("Allow Tearing"), false);
+#endif
 }
 
 void ShaderWindow::SaveMaxCaptureRateState(bool state)
 {
+#ifndef FORCE_MAXCAPTURE
     SaveRegistryOption(TEXT("Max Capture Rate"), state);
+#endif
 }
 
 bool ShaderWindow::GetMaxCaptureRateState()
 {
-    return GetRegistryOption(TEXT("Max Capture Rate"), false);
+#ifdef FORCE_MAXCAPTURE
+    return true;
+#else
+    return GetRegistryOption(TEXT("Max Capture Rate"), true);
+#endif
 }
 
 void ShaderWindow::SaveUseHDRState(bool state)
@@ -2732,7 +2895,42 @@ void ShaderWindow::RemoveRecentImport(const std::wstring& path)
 
 void ShaderWindow::UpdateGPUName()
 {
-    ModifyMenu(m_gpuMenu, ID_GPU_DEFAULT, MF_BYCOMMAND | MF_STRING | MF_CHECKED | MF_DISABLED, ID_GPU_DEFAULT, m_captureManager.m_deviceName.c_str());
+    const auto& gpus = m_captureManager.GraphicsAdapters();
+    if(gpus.size() > 1)
+    {
+        int          ci = 0, ri = 0;
+        std::wstring adapterName;
+        for(int i = 0; i < gpus.size(); i++)
+        {
+            const auto& gpu = gpus.at(i);
+            if(gpu.capture)
+            {
+                ci          = gpu.no;
+                adapterName = gpu.name;
+            }
+            if(gpu.render)
+                ri = gpu.no;
+        }
+
+        if(m_captureManager.m_defaultAdapter)
+        {
+            std::wstring defaultString(L"Default: " + adapterName);
+            ModifyMenu(m_gpuMenu, ID_GPU_DEFAULT, MF_BYCOMMAND | MF_STRING | MF_CHECKED | MF_ENABLED, ID_GPU_DEFAULT, defaultString.c_str());
+            CheckMenuRadioItem(m_gpuMenu, WM_GPU(0, 0), WM_GPU(MAX_GPU, MAX_GPU), WM_GPU(0, 0), MF_BYCOMMAND);
+            CheckMenuRadioItem(m_crossMenu, WM_GPU(0, 0), WM_GPU(MAX_GPU, MAX_GPU), WM_GPU(0, 0), MF_BYCOMMAND);
+        }
+        else
+        {
+            ModifyMenu(m_gpuMenu, ID_GPU_DEFAULT, MF_BYCOMMAND | MF_STRING | MF_UNCHECKED | MF_ENABLED, ID_GPU_DEFAULT, L"Default");
+            CheckMenuRadioItem(m_gpuMenu, WM_GPU(0, 0), WM_GPU(MAX_GPU, MAX_GPU), WM_GPU(ci, ri), MF_BYCOMMAND);
+            CheckMenuRadioItem(m_crossMenu, WM_GPU(0, 0), WM_GPU(MAX_GPU, MAX_GPU), WM_GPU(ci, ri), MF_BYCOMMAND);
+        }
+    }
+    else
+    {
+        const auto& gpu = gpus.at(0);
+        ModifyMenu(m_gpuMenu, ID_GPU_DEFAULT, MF_BYCOMMAND | MF_STRING | MF_CHECKED | MF_DISABLED, ID_GPU_DEFAULT, gpu.name.c_str());
+    }
 }
 
 std::wstring ShaderWindow::GetDefaultPath() const
@@ -2832,13 +3030,33 @@ void ShaderWindow::UpdateHotkey(const HotkeyInfo& hk, bool globalState)
     }
 }
 
+void ShaderWindow::LoadGPUs()
+{
+    LUID captureId {.LowPart = (DWORD)GetRegistryInt(L"CaptureGPU.LowPart", 0), .HighPart = GetRegistryInt(L"CaptureGPU.HighPart", 0)};
+    LUID renderId {.LowPart = (DWORD)GetRegistryInt(L"RenderGPU.LowPart", 0), .HighPart = GetRegistryInt(L"RenderGPU.HighPart", 0)};
+    if(captureId.LowPart || captureId.HighPart || renderId.LowPart || renderId.HighPart)
+    {
+        m_captureManager.SetGraphicsAdapters(captureId, renderId);
+        m_captureManager.m_defaultAdapter = false;
+    }
+    UpdateGPUName();
+}
+
+void ShaderWindow::SaveGPUs(const LUID& captureId, const LUID& renderId)
+{
+    SaveRegistryInt(L"CaptureGPU.LowPart", captureId.LowPart);
+    SaveRegistryInt(L"CaptureGPU.HighPart", captureId.HighPart);
+    SaveRegistryInt(L"RenderGPU.LowPart", renderId.LowPart);
+    SaveRegistryInt(L"RenderGPU.HighPart", renderId.HighPart);
+}
+
 void ShaderWindow::LoadHotkeys()
 {
     m_hotkeys.emplace(ID_GLOBALHOTKEYS_FULLSCREEN, HotkeyInfo(ID_GLOBALHOTKEYS_FULLSCREEN, MAKEWORD('G', MOD_CONTROL | MOD_SHIFT), L"Fullscreen Key", L"g"));
     m_hotkeys.emplace(ID_GLOBALHOTKEYS_SCREENSHOT, HotkeyInfo(ID_GLOBALHOTKEYS_SCREENSHOT, MAKEWORD('S', MOD_CONTROL | MOD_SHIFT), L"Screenshot Key", L"s"));
     m_hotkeys.emplace(ID_GLOBALHOTKEYS_PAUSE, HotkeyInfo(ID_GLOBALHOTKEYS_PAUSE, 0, L"Pause Key", L"t"));
     m_hotkeys.emplace(ID_GLOBALHOTKEYS_CURSOR, HotkeyInfo(ID_GLOBALHOTKEYS_CURSOR, 0, L"Cursor Key", L"c"));
-    m_hotkeys.emplace(ID_GLOBALHOTKEYS_ACTIVE, HotkeyInfo(ID_GLOBALHOTKEYS_ACTIVE, 0, L"Active Key", L"a"));
+    m_hotkeys.emplace(ID_GLOBALHOTKEYS_ACTIVE, HotkeyInfo(ID_GLOBALHOTKEYS_ACTIVE, MAKEWORD('A', MOD_CONTROL | MOD_SHIFT), L"Active Key", L"a"));
     m_hotkeys.emplace(ID_GLOBALHOTKEYS_SHOWMENU, HotkeyInfo(ID_GLOBALHOTKEYS_SHOWMENU, 0, L"Menu Key", L"m"));
 }
 
@@ -2857,7 +3075,7 @@ void ShaderWindow::RegisterHotkeys()
     {
         if(hk.second.currentKey)
             RegisterHotKey(m_mainWindow, hk.first, HIBYTE(hk.second.currentKey), LOBYTE(hk.second.currentKey));
-    }    
+    }
 }
 
 void ShaderWindow::UnregisterHotkeys()
@@ -2900,6 +3118,7 @@ void ShaderWindow::Start(_In_ LPWSTR lpCmdLine, HWND paramsWindow, HWND browserW
     m_inputDialog.reset(new InputDialog(m_instance, m_mainWindow));
     m_cropDialog.reset(new CropDialog(m_instance, m_mainWindow));
     m_hotkeyDialog.reset(new HotkeyDialog(m_instance, m_mainWindow));
+    GetTicks();
 
     if(autoStart && HasCaptureAPI())
     {
@@ -2910,6 +3129,8 @@ void ShaderWindow::Start(_In_ LPWSTR lpCmdLine, HWND paramsWindow, HWND browserW
     {
         SendMessage(m_mainWindow, WM_COMMAND, ID_PROCESSING_FULLSCREEN, 0);
     }
+
+    m_captureManager.GraphicsAdapters();
 
     SetTimer(m_mainWindow, TIMER_TITLE, 1000, NULL);
 }

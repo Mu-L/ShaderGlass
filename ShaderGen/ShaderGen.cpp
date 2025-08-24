@@ -580,6 +580,24 @@ void populatePresetTemplate(
             outfile << "See original file for credits and usage license. " << endl;
             outfile << "This file is auto-generated, do not modify directly." << endl;
         }
+        else if(line.find("%REQUIRES_SUBFRAMES%") != string::npos)
+        {
+            auto requiresSubFrames = false;
+            for(const auto& s : shaders)
+            {
+                std::vector<SourceShaderSampler> textures;
+                auto actualParams = ShaderGC::LookupParams(s.params, textures, s.fragmentMetadata);
+                for(const auto& p : actualParams)
+                {
+                    requiresSubFrames |= (p.name == "CurrentSubFrame" || p.name == "TotalSubFrames");
+                }
+            }
+            if(requiresSubFrames)
+            {
+                replace(line, "%REQUIRES_SUBFRAMES%", "true");
+                outfile << line << endl;
+            }
+        }
         else
             outfile << line << endl;
     }

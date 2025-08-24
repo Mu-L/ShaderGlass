@@ -391,7 +391,7 @@ void BrowserWindow::Build()
             categoryMenus.insert(std::make_pair(sp->Category, std::map<std::string, UINT, decltype(shaderComp)>()));
         }
         auto& menu = categoryMenus.find(sp->Category)->second;
-        menu.insert(std::make_pair(sp->Name, WM_SHADER(i++)));
+        menu.insert(std::make_pair(DisplayName(sp), WM_SHADER(i++)));
     }
 
     m_personalItems = AddItemToTree(m_treeControl, convertCharArrayToLPCWSTR("Personal Favorites"), -1, 1);
@@ -563,8 +563,8 @@ void BrowserWindow::LoadPersonal()
                         {
                             auto id = WM_SHADER(p);
                             if(m_personal.find(id) == m_personal.end())
-                            {
-                                m_personal[id] = AddItemToTree(m_treeControl, convertCharArrayToLPCWSTR(profileName), id, 2);
+                            {                                
+                                m_personal[id] = AddItemToTree(m_treeControl, convertCharArrayToLPCWSTR(DisplayName(preset).c_str()), id, 2);
                             }
                             continue;
                         }
@@ -738,7 +738,8 @@ LRESULT CALLBACK BrowserWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, 
             is.hParent             = m_imported;
             is.hInsertAfter        = TVI_LAST;
             is.item.mask           = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_PARAM;
-            is.item.pszText        = convertCharArrayToLPCWSTR(m_captureManager.Presets().at(lParam)->Name.c_str());
+            const auto& preset     = m_captureManager.Presets().at(lParam);
+            is.item.pszText        = convertCharArrayToLPCWSTR(DisplayName(preset).c_str());
             is.item.cchTextMax     = sizeof(is.item.pszText) / sizeof(is.item.pszText[0]);
             is.item.iImage         = g_nDocument;
             is.item.iSelectedImage = g_nDocument;
@@ -778,7 +779,7 @@ LRESULT CALLBACK BrowserWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, 
                     is.hParent             = m_personalItems;
                     is.hInsertAfter        = TVI_LAST;
                     is.item.mask           = TVIF_TEXT | TVIF_IMAGE | TVIF_SELECTEDIMAGE | TVIF_PARAM;
-                    is.item.pszText        = convertCharArrayToLPCWSTR(preset->Name.c_str());
+                    is.item.pszText        = convertCharArrayToLPCWSTR(DisplayName(preset).c_str());
                     is.item.cchTextMax     = sizeof(is.item.pszText) / sizeof(is.item.pszText[0]);
                     is.item.iImage         = g_nDocument;
                     is.item.iSelectedImage = g_nDocument;
@@ -817,6 +818,11 @@ LRESULT CALLBACK BrowserWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, 
     }
     }
     return DefWindowProc(hWnd, message, wParam, lParam);
+}
+
+std::string BrowserWindow::DisplayName(const std::unique_ptr<PresetDef>& preset)
+{
+    return preset->RequiresSubFrames ? (preset->Name + " (>60Hz)") : preset->Name;
 }
 
 bool BrowserWindow::Create(_In_ HINSTANCE hInstance, _In_ int nCmdShow, _In_ HWND shaderWindow, _In_ HWND paramsWindow)

@@ -17,6 +17,9 @@ GNU General Public License v3.0
 #define MAX_CAPTURE_DEVICE_FORMATS 1024U
 #define MAX_RECENT_PROFILES 20U
 #define MAX_RECENT_IMPORTS 20U
+#define MAX_SUBFRAMES 10U
+#define MAX_GPU 4U
+#define MAX_GPUS 17U
 
 #define WM_PIXEL_SIZE(i) (static_cast<UINT>(WM_USER) + i)
 #define WM_ASPECT_RATIO(i) (static_cast<UINT> WM_PIXEL_SIZE(MAX_PIXEL_SIZES) + i)
@@ -28,8 +31,13 @@ GNU General Public License v3.0
 #define WM_RECENT_PROFILE(i) (static_cast<UINT> WM_CAPTURE_DISPLAY(MAX_CAPTURE_DISPLAYS) + i)
 #define WM_RECENT_IMPORT(i) (static_cast<UINT> WM_RECENT_PROFILE(MAX_RECENT_PROFILES) + i)
 #define WM_CAPTURE_DEVICE_FORMAT(i) (static_cast<UINT> WM_RECENT_IMPORT(MAX_RECENT_IMPORTS) + i)
+#define WM_SUBFRAMES(i) (static_cast<UINT> WM_CAPTURE_DEVICE_FORMAT(MAX_CAPTURE_DEVICE_FORMATS) + i)
+#define WM_GPU(ci, ri) (static_cast<UINT> WM_SUBFRAMES(MAX_SUBFRAMES) + (ci << 2) + ri)
 
 #define CUSTOM_MNEMONIC "Custom"
+
+//#define FORCE_FLIPMODE
+//#define FORCE_MAXCAPTURE
 
 struct PixelSizeInfo
 {
@@ -57,6 +65,15 @@ struct FrameSkipInfo
     const char* mnemonic;
 
     FrameSkipInfo(int s, LPCWSTR text, const char* mnemonic) : s(s), text(text), mnemonic(mnemonic) { }
+};
+
+struct SubFrameInfo
+{
+    unsigned    s;
+    LPCWSTR     text;
+    const char* mnemonic;
+
+    SubFrameInfo(int s, LPCWSTR text, const char* mnemonic) : s(s), text(text), mnemonic(mnemonic) { }
 };
 
 struct OutputScaleInfo
@@ -105,6 +122,17 @@ struct CaptureDevice
     std::vector<CaptureFormat> formats;
 };
 
+struct GraphicsAdapter
+{
+    unsigned                     no;
+    std::wstring                 name;
+    winrt::com_ptr<IDXGIAdapter> adapter;
+    LUID                         luid;
+
+    bool capture;
+    bool render;
+};
+
 struct HotkeyInfo
 {
     HotkeyInfo(UINT id, WORD defaultKey, const wchar_t* name, const wchar_t* accelerator) :
@@ -132,6 +160,15 @@ static const std::map<UINT, PixelSizeInfo> pixelSizes = {{WM_PIXEL_SIZE(0), Pixe
                                                          {WM_PIXEL_SIZE(12), PixelSizeInfo(9.0f, 9.0f, L"x9 (240p -> 4K)", "9")},
                                                          {WM_PIXEL_SIZE(13), PixelSizeInfo(10.0f, 10.0f, L"x10", "10")},
                                                          {WM_PIXEL_SIZE(14), PixelSizeInfo(10.8f, 10.8f, L"x10.8 (200p -> 4K)", "10.8")}};
+
+static const std::map<UINT, SubFrameInfo> subFrames = {{WM_SUBFRAMES(0), SubFrameInfo(0, L"disabled", "0")},
+                                                       {WM_SUBFRAMES(1), SubFrameInfo(2, L"2 (120 Hz)", "2")},
+                                                       {WM_SUBFRAMES(2), SubFrameInfo(3, L"3 (180 Hz)", "3")},
+                                                       {WM_SUBFRAMES(3), SubFrameInfo(4, L"4 (240 Hz)", "4")},
+                                                       {WM_SUBFRAMES(4), SubFrameInfo(5, L"5 (300 Hz)", "5")},
+                                                       {WM_SUBFRAMES(5), SubFrameInfo(6, L"6 (360 Hz)", "6")},
+                                                       {WM_SUBFRAMES(6), SubFrameInfo(7, L"7 (420 Hz)", "7")},
+                                                       {WM_SUBFRAMES(7), SubFrameInfo(8, L"8 (480 Hz)", "8")}};
 
 static std::map<UINT, AspectRatioInfo> aspectRatios = {
     {WM_ASPECT_RATIO(0), AspectRatioInfo(1.0f, L"None", "1")},

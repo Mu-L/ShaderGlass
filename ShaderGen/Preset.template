@@ -13,6 +13,7 @@ public:
 	{
 		Name = "%PRESET_NAME%";
 		Category = "%PRESET_CATEGORY%";
+		RequiresSubFrames = %REQUIRES_SUBFRAMES%;
 	}
 
 	void Build() {

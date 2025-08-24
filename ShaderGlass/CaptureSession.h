@@ -9,22 +9,45 @@ GNU General Public License v3.0
 
 #include "ShaderGlass.h"
 
+class TextureBridge
+{
+public:
+    TextureBridge(winrt::com_ptr<ID3D11Device> captureDevice, winrt::com_ptr<ID3D11Device> renderDevice);
+    ~TextureBridge();
+
+    void                            PutInputFrame(winrt::com_ptr<ID3D11Texture2D> inputFrame, bool resized);
+    winrt::com_ptr<ID3D11Texture2D> GetInputFrame();
+
+private:
+    winrt::com_ptr<ID3D11Texture2D>     m_inputFrame {nullptr};
+    winrt::com_ptr<ID3D11Device>        m_captureDevice {nullptr};
+    winrt::com_ptr<ID3D11DeviceContext> m_captureContext {nullptr};
+    winrt::com_ptr<ID3D11Device>        m_renderDevice {nullptr};
+    winrt::com_ptr<ID3D11DeviceContext> m_renderContext {nullptr};
+    D3D11_TEXTURE2D_DESC                m_inputFrameDesc;
+    volatile bool                       m_inputUpdated {false};
+    volatile bool                       m_inputResized {false};
+    void*                               m_inputData {nullptr};
+    size_t                              m_inputSize {0};
+    std::mutex                          m_inputMutex;
+    winrt::com_ptr<ID3D11Texture2D>     m_sharedFrame {nullptr};
+};
+
 class CaptureSession
 {
 public:
-    CaptureSession(winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice const& device,
-                   winrt::Windows::Graphics::Capture::GraphicsCaptureItem const&         item,
-                   winrt::Windows::Graphics::DirectX::DirectXPixelFormat                 pixelFormat,
-                   ShaderGlass&                                                          shaderGlass,
-                   bool                                                                  maxCaptureRate,
-                   HANDLE                                                                frameEvent);
+    CaptureSession(winrt::com_ptr<ID3D11Device>                                  captureDevice,
+                   winrt::com_ptr<ID3D11Device>                                  renderDevice,
+                   winrt::Windows::Graphics::Capture::GraphicsCaptureItem const& item,
+                   winrt::Windows::Graphics::DirectX::DirectXPixelFormat         pixelFormat,
+                   ShaderGlass&                                                  shaderGlass,
+                   bool                                                          maxCaptureRate,
+                   bool                                                          synchronous,
+                   HANDLE                                                        frameEvent);
 
-    CaptureSession(winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice const& device,
-                   winrt::com_ptr<ID3D11Texture2D>                                       inputImage,
-                   ShaderGlass&                                                          shaderGlass,
-                   HANDLE                                                                frameEvent);
+    CaptureSession(winrt::com_ptr<ID3D11Texture2D> inputImage, ShaderGlass& shaderGlass, HANDLE frameEvent);
 
-    void OnFrameArrived(winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool const& sender, winrt::Windows::Foundation::IInspectable const& args);
+    bool OnFrameArrived(winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool const& sender, winrt::Windows::Foundation::IInspectable const& args);
 
     void Stop();
 
@@ -34,9 +57,14 @@ public:
 
     void ProcessInput();
 
-    float FPS()
+    float FPS() const
     {
         return m_fps;
+    }
+
+    bool Synchronous() const
+    {
+        return m_synchronous;
     }
 
 private:
@@ -56,5 +84,7 @@ private:
     ULONGLONG                                                      m_prevTicks {0};
     int                                                            m_prevInputFrames {0};
     HANDLE                                                         m_frameEvent {nullptr};
+    bool                                                           m_synchronous {false};
     ShaderGlass&                                                   m_shaderGlass;
+    TextureBridge                                                  m_textureBridge;
 };

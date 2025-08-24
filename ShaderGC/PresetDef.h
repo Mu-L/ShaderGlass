@@ -14,7 +14,7 @@ GNU General Public License v3.0
 class PresetDef
 {
 public:
-    PresetDef() : ShaderDefs {}, TextureDefs {}, Overrides {}, Name {}, Category {}, ImportPath {} { }
+    PresetDef() : ShaderDefs {}, TextureDefs {}, Overrides {}, Name {}, Category {}, ImportPath {}, RequiresSubFrames {false} { }
 
     virtual void Build() { }
 
@@ -38,4 +38,5 @@ public:
     std::string                Name;
     std::string                Category;
     std::filesystem::path      ImportPath;
+    bool                       RequiresSubFrames;
 };

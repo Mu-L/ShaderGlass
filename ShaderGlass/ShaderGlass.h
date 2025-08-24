@@ -39,15 +39,17 @@ public:
     void  SetCroppedArea(RECT area);
     void  SetFreeScale(bool freeScale);
     void  SetVertical(bool vertical);
-    float FPS()
-    {
-        return m_fps;
-    }
+    void  SetSubFrames(unsigned subFrames);
+    void  SetSyncSubFrame(bool syncSubFrame);
+    float FPS() const;
+    int   ActiveSubFrames() const;
+
     winrt::com_ptr<ID3D11Texture2D>            GrabOutput();
     std::vector<std::tuple<int, ShaderParam*>> Params();
     void                                       UpdateParams();
     void                                       ResetParams();
     float                                      GetDefaultValue(ShaderParam* p);
+    bool                                       RequiresSubFrames() const;
     void                                       Stop();
     ~ShaderGlass();
 
@@ -58,7 +60,7 @@ private:
     void DestroyPasses();
     void DestroyTargets();
     void RebuildShaders();
-    void PresentFrame();
+    void PresentFrame(bool vsync);
 
     POINT                                    m_lastSize;
     POINT                                    m_lastPos;
@@ -92,17 +94,19 @@ private:
     bool       m_useHDR {false};
     int        m_frameCounter {0};
     int        m_logicalFrameCounter {0};
-    ULONGLONG  m_startTicks {0};
+    int32_t    m_startTicks {0};
     int        m_renderCounter {0};
     int        m_prevRenderCounter {0};
-    ULONGLONG  m_prevRenderTicks {0};
-    ULONGLONG  m_prevTicks {0};
-    ULONGLONG  m_prevFrameTicks {0};
+    int32_t    m_prevRenderTicks {0};
+    int32_t    m_prevTicks {0};
+    int32_t    m_prevFrameTicks {0};
     int        m_prevInputFrameNo {0};
     int        m_prevLogicalFrameNo {0};
+    int        m_prevSubFrameNo {0};
     float      m_fps {0};
     bool       m_requiresFeedback {false};
     int        m_requiresHistory {0};
+    bool       m_requiresSubFrames {false};
     std::mutex m_mutex {};
     int        m_boxX {0};
     int        m_boxY {0};
@@ -135,4 +139,7 @@ private:
     volatile bool  m_croppedAreaUpdated {false};
     volatile bool  m_vertical {false};
     volatile bool  m_verticalUpdated {false};
+    volatile int   m_subFrames {0};
+    volatile bool  m_subFramesUpdated {false};
+    volatile bool  m_syncSubFrame {true};
 };

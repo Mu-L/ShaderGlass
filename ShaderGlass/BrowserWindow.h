@@ -58,6 +58,7 @@ private:
     ATOM                    MyRegisterClass(HINSTANCE hInstance);
     BOOL                    InitInstance(HINSTANCE hInstance, int nCmdShow);
     LRESULT CALLBACK        WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+    static std::string      DisplayName(const std::unique_ptr<PresetDef>& preset);
 
     BOOL      CreateImageList(HWND hwndTV);
     void      CreatePixelSizeSlider(const RECT& rcClient);

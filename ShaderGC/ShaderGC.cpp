@@ -110,6 +110,10 @@ PresetDef* ShaderGC::CompileShader(std::filesystem::path source, ostream& log, b
     }
     pdef->Category = "Imported";
     pdef->ShaderDefs.push_back(shaderDef);
+    for(const auto& sp : def.params)
+    {
+        pdef->RequiresSubFrames |= (sp.name == "CurrentSubFrame" || sp.name == "TotalSubFrames");
+    }
     pdef->ImportPath = source;
 
     return pdef;
@@ -251,6 +255,8 @@ void ShaderGC::ProcessSourceShader(SourceShaderDef& def, ostream& log, bool& war
     def.params.push_back(SourceShaderParam("OriginalSize", 4, 0));
     def.params.push_back(SourceShaderParam("OutputSize", 4, 0));
     def.params.push_back(SourceShaderParam("FrameCount", 1, 0));
+    def.params.push_back(SourceShaderParam("CurrentSubFrame", 1, 0));
+    def.params.push_back(SourceShaderParam("TotalSubFrames", 1, 0));
 }
 
 int GetSize(const std::string& mtype)
@@ -533,6 +539,7 @@ PresetDef* ShaderGC::CompilePreset(std::filesystem::path input, ostream& log, bo
     }
     def->Category = "Imported";
 
+    bool requiresSubFrames = false;
     for(auto& s : sp.shaders)
     {
         ProcessSourceShader(s, log, warn);
@@ -542,6 +549,10 @@ PresetDef* ShaderGC::CompilePreset(std::filesystem::path input, ostream& log, bo
             sd.Param(pp.first.c_str(), pp.second.c_str());
         }
         def->ShaderDefs.push_back(sd);
+        for(const auto& sp : s.params)
+        {
+            requiresSubFrames |= (sp.name == "CurrentSubFrame" || sp.name == "TotalSubFrames");
+        }
     }
 
     for(auto& t : sp.textures)
@@ -560,6 +571,7 @@ PresetDef* ShaderGC::CompilePreset(std::filesystem::path input, ostream& log, bo
     }
 
     def->ImportPath = input;
+    def->RequiresSubFrames = requiresSubFrames;
 
     return def;
 }
